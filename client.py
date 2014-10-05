@@ -5,7 +5,7 @@ import os
 import sys
 import requests
 import re
-from bot import RandomBot, SlowBot
+from bot import RandomBot, SlowBot, NitorBot
 
 TIMEOUT=15
 
@@ -77,6 +77,8 @@ def start(server_url, key, mode, turns, bot):
 
     # Clean up the session
     session.close()
+    
+    return state['viewUrl']
 
 
 if __name__ == "__main__":
@@ -100,5 +102,7 @@ if __name__ == "__main__":
             server_url = "http://vindinium.org"
 
         for i in range(number_of_games):
-            start(server_url, key, mode, number_of_turns, RandomBot())
+            viewUrl = start(server_url, key, mode, number_of_turns, NitorBot())
             print("\nGame finished: %d/%d" % (i+1, number_of_games))
+            
+        print viewUrl
