@@ -116,6 +116,5 @@ if __name__ == "__main__":
         for i in range(number_of_games):
             viewUrl = start(server_url, key, mode, number_of_turns, NitorBot())
             print("\nGame finished: %d/%d" % (i+1, number_of_games))
-            
-        print viewUrl     
+             
         recordURL(viewUrl)
