@@ -9,6 +9,8 @@ from bot import RandomBot, SlowBot, NitorBot
 
 TIMEOUT=15
 
+vfName = 'viewgames.html'
+
 def get_new_game_state(session, server_url, key, mode='training', number_of_turns = 10):
     """Get a JSON from the server containing the current state of the game"""
 
@@ -81,6 +83,16 @@ def start(server_url, key, mode, turns, bot):
     return state['viewUrl']
 
 
+def recordURL(viewUrl):
+    vf = open(vfName, 'a')
+        
+    if (vf == None):
+        print('Error opening file: ', vf)
+    else:
+        vf.write('<p><a href="' + viewUrl + '">' + viewUrl + '</a></p>')
+        vf.write("\n")
+        vf.close()
+
 if __name__ == "__main__":
     if (len(sys.argv) < 4):
         print("Usage: %s <key> <[training|arena]> <number-of-games|number-of-turns> [server-url]" % (sys.argv[0]))
@@ -105,4 +117,5 @@ if __name__ == "__main__":
             viewUrl = start(server_url, key, mode, number_of_turns, NitorBot())
             print("\nGame finished: %d/%d" % (i+1, number_of_games))
             
-        print viewUrl
+        print viewUrl     
+        recordURL(viewUrl)
