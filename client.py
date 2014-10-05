@@ -118,3 +118,4 @@ if __name__ == "__main__":
             print("\nGame finished: %d/%d" % (i+1, number_of_games))
              
         recordURL(viewUrl)
+        
