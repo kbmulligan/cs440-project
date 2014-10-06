@@ -18,9 +18,15 @@ class HeroTile:
     def __init__(self, id):
         self.id = id
 
+    def __repr__(self):
+        return '@' + str(self.id)
+
 class MineTile:
     def __init__(self, heroId = None):
         self.heroId = heroId
+
+    def __repr__(self):
+        return 'M' + str(self.heroId)
 
 class Game:
     def __init__(self, state):
@@ -43,17 +49,17 @@ class Game:
 
 
 class Board:
-    def __parseTile(self, str):
-        if (str == '  '):
+    def __parseTile(self, string):
+        if (string == '  '):
             return AIR
-        if (str == '##'):
+        if (string == '##'):
             return WALL
-        if (str == '[]'):
+        if (string == '[]'):
             return TAVERN
-        match = re.match('\$([-0-9])', str)
+        match = re.match('\$([-0-9])', string)
         if (match):
             return MineTile(match.group(1))
-        match = re.match('\@([0-9])', str)
+        match = re.match('\@([0-9])', string)
         if (match):
             return HeroTile(match.group(1))
 
@@ -68,7 +74,7 @@ class Board:
         self.tiles = self.__parseTiles(board['tiles'])
 
     def passable(self, loc):
-        'true if can not walk through'
+        """True if can walk through"""
         x, y = loc
         pos = self.tiles[x][y]
         return (pos != WALL) and (pos != TAVERN) and not isinstance(pos, MineTile)
@@ -94,4 +100,6 @@ class Hero:
         self.pos = hero['pos']
         self.life = hero['life']
         self.gold = hero['gold']
+        self.mineCount = hero['mineCount']
+        self.crashed = hero['crashed']
 

@@ -8,6 +8,7 @@ import re
 from bot import RandomBot, SlowBot, NitorBot
 
 TIMEOUT=15
+MAP = 'm2'
 
 vfName = 'viewgames.html'
 
@@ -16,7 +17,7 @@ def get_new_game_state(session, server_url, key, mode='training', number_of_turn
 
     if(mode=='training'):
         #Don't pass the 'map' parameter if you want a random map
-        params = { 'key': key, 'turns': number_of_turns, 'map': 'm1'}
+        params = { 'key': key, 'turns': number_of_turns, 'map': MAP}
         api_endpoint = '/api/training'
     elif(mode=='arena'):
         params = { 'key': key}
@@ -44,6 +45,7 @@ def move(session, url, direction):
             return r.json()
         else:
             print("Error HTTP %d\n%s\n" % (r.status_code, r.text))
+            print r.text
             return {'game': {'finished': True}}
     except requests.exceptions.RequestException as e:
         print(e)
@@ -64,6 +66,7 @@ def start(server_url, key, mode, turns, bot):
     # Get the initial state
     state = get_new_game_state(session, server_url, key, mode, turns)
     print("Playing at: " + state['viewUrl'])
+    viewURL = state['viewUrl']
 
     while not is_finished(state):
         # Some nice output ;)
@@ -80,7 +83,7 @@ def start(server_url, key, mode, turns, bot):
     # Clean up the session
     session.close()
     
-    return state['viewUrl']
+    return viewURL
 
 
 def recordURL(viewUrl):
@@ -116,6 +119,6 @@ if __name__ == "__main__":
         for i in range(number_of_games):
             viewUrl = start(server_url, key, mode, number_of_turns, NitorBot())
             print("\nGame finished: %d/%d" % (i+1, number_of_games))
-             
+            
         recordURL(viewUrl)
         
