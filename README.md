@@ -1,4 +1,8 @@
-Should work with python2 and python3.
+Vindinium Bot AI
+=========================
+Started Oct 2014
+
+- Uses Python 2.7
 
 Install deps:
 
