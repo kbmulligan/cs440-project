@@ -62,7 +62,7 @@ def start(server_url, key, mode, turns, bot):
     session = requests.session()
 
     if(mode=='arena'):
-        print(u'Connected and waiting for other players to join…')
+        print(u'Connected and waiting for other players to join...')
     # Get the initial state
     state = get_new_game_state(session, server_url, key, mode, turns)
     print("Playing at: " + state['viewUrl'])

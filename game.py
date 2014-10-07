@@ -12,7 +12,8 @@ PLAYER4 = 4
 AIM = {'North': (-1, 0),
        'East': (0, 1),
        'South': (1, 0),
-       'West': (0, -1)}
+       'West': (0, -1),
+       'Stay': (0, 0)}
 
 class HeroTile:
     def __init__(self, id):
@@ -74,10 +75,13 @@ class Board:
         self.tiles = self.__parseTiles(board['tiles'])
 
     def passable(self, loc):
-        """True if can walk through"""
+        """True if can walk through. NOTE: This will return True even if occupied by another player."""
         x, y = loc
         pos = self.tiles[x][y]
         return (pos != WALL) and (pos != TAVERN) and not isinstance(pos, MineTile)
+
+    def passables(self, locs):
+        return [x for x in locs if (self.passable(x))]
 
     def to(self, loc, direction):
         'calculate a new location given the direction'
@@ -102,4 +106,5 @@ class Hero:
         self.gold = hero['gold']
         self.mineCount = hero['mineCount']
         self.crashed = hero['crashed']
+        self.id = hero['id']
 
