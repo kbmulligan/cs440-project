@@ -25,7 +25,7 @@ TRAVEL = 'TRAVEL'
 
 TIME_THRESHOLD = 0.9
 
-LIFE_THRESHOLD = 80
+LIFE_THRESHOLD = 50
 
 STEPS_TO_DISPLAY = 9
 
@@ -79,13 +79,11 @@ class NitorBot(Bot):
         self.goal = self.determine_goal(game)
         self.dest = self.determine_dest(self.goal, game)
 
-
         if self.dest:                                       # Make progress toward destination
             self.mode = TRAVEL
             path = get_path(self.dest, self.pos, game.board)
-            if len(path) > 1:
-                next_loc = path[-1]
-                direction = self.get_dir_to(next_loc, game.board)
+            next_loc = path[1]
+            direction = self.get_dir_to(next_loc, game.board)
             print direction
         
         else:
@@ -159,9 +157,6 @@ class NitorBot(Bot):
             else:
                 d = STAY
 
-        if not board.passable(board.to(self.pos, d)) and board.to(self.pos, d) != dest:
-            d = random.choice(dirs)
-
         return d
 
     def set_dest(self, newDest):
@@ -174,11 +169,6 @@ class NitorBot(Bot):
     def update(self, game):
         self.turn = game.state['game']['turn'] / PLAYERS
         
-        history = self.locHistory
-        if (len(history) > STEPS_TO_DISPLAY):
-            history = history[-STEPS_TO_DISPLAY:]
-        # print 'History:', history
-        
         for hero in game.heroes:
             if hero.name == 'nitorbot':
                 self.gold = hero.gold
@@ -190,10 +180,18 @@ class NitorBot(Bot):
                 self.identity = hero.id
 
     def summary(self):
+        history = self.locHistory
+        if (len(history) > STEPS_TO_DISPLAY):
+            history = history[-STEPS_TO_DISPLAY:]
+        # print 'History:', history
+
         return 'Turn: ' + str(self.turn) + '  pos: ' + str(self.pos) + '  $: ' + str(self.gold) + \
              '  Life: ' + str(self.life) + '  Mines: ' + str(self.mineCount) + '  Dest: ' + str(self.dest)
         # + '  ID: ' + str(self.identity)
         # + '  Crashed: ' + str(self.crashed)
+        # + ' \n--History: ' + str(history)
+
+
 
         
     # returns list of positions of nearest 'obj' (from player) in state 'game' sorted from nearest to farthest
@@ -352,9 +350,16 @@ def get_path(start, end, board):
     frontier = PriorityQueue()
     frontier.insert(start, cost_estimate(start, end))
 
+    # print 'get_path start, end:', start, end
+
     while not frontier.is_empty():
+
+        # print 'get_path frontier:', frontier
+
         current = frontier.remove()
         explored.add(current)
+
+        # print 'get_path current:', current
 
         if (current == end):
             # print 'Found end loc'
@@ -362,8 +367,10 @@ def get_path(start, end, board):
         else:
             neighbors = get_neighboring_locs(current, board)
 
+            # print 'get_path neighbors:', neighbors
+
             for n in neighbors:
-                if n not in explored and (board.passable(n) or n in (start, end)):
+                if n not in moves and (board.passable(n) or n in (start, end)):
                     moves[n] = moves[current] + MOVE_COST
                     frontier.insert(n, cost_estimate(n, end) + moves[n])
                     previous[n] = current
