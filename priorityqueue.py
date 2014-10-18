@@ -1,34 +1,47 @@
+import Queue
+
 class PriorityQueue:
 
-    queue = {}
+    queue = None
 
     def __init__(self):
-        self.queue = {}
+        self.queue = Queue.PriorityQueue()
 
     def __len__(self):
-        return len(self.queue.keys())
+        return len(self.queue)
 
     def __repr__(self):
         return str(self.queue)
 
     def insert(self, item, score):
-        self.queue[score] = item
+        self.queue.put((score, item))
 
     def remove(self):
         """Returns and removes item with min score"""
         if self.is_empty():
             item = None
+            print 'PriorityQueue: Tried to remove from empty queue!'
         else:
-            scores = self.queue.keys()
-            item = self.queue[min(scores)]
-            del self.queue[min(scores)]
+            item = self.queue.get()[1]
         return item
 
     def is_empty(self):
-        empty = True
-        if self.queue:
-            empty = False
-        return empty
+        return self.queue.empty()
 
 
 
+#### TODO: Fix this. It overwrites valid data when told to insert on top of a score that is already present in the queue. ####
+
+if __name__ == '__main':
+    q = PriorityQueue()
+
+    q.insert('a', 1)
+    q.insert('b', 2)
+    q.insert('c', 3)
+
+    q.insert('z', 1)
+    q.insert('b', 4)
+
+    print q
+    print q.remove()
+    print q.remove()

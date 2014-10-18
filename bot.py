@@ -1,7 +1,18 @@
+#################################################
+# bot.py - Vindinium bot move AI
+# by Stephen Rhoads
+#    Brett Mulligan
+# Oct 2014
+# CSU CS440
+# Dr. Asa Ben-Hur
+#################################################
+
 import random
 import time
 from game import Game, Board
 from priorityqueue import PriorityQueue
+
+VERBOSE_ASTAR = False
 
 PLAYERS = 4
 HERO_IDs = ['1', '2', '3', '4']
@@ -25,7 +36,7 @@ TRAVEL = 'TRAVEL'
 
 TIME_THRESHOLD = 0.9
 
-LIFE_THRESHOLD = 50
+LIFE_THRESHOLD = 70
 
 STEPS_TO_DISPLAY = 9
 
@@ -81,8 +92,11 @@ class NitorBot(Bot):
 
         if self.dest:                                       # Make progress toward destination
             self.mode = TRAVEL
-            path = get_path(self.dest, self.pos, game.board)
+            path = get_path(self.pos, self.dest, game.board)
+            print 'Current path:', path
             next_loc = path[1]
+            print 'Next move:', next_loc
+
             direction = self.get_dir_to(next_loc, game.board)
             print direction
         
@@ -350,27 +364,29 @@ def get_path(start, end, board):
     frontier = PriorityQueue()
     frontier.insert(start, cost_estimate(start, end))
 
-    # print 'get_path start, end:', start, end
+    if VERBOSE_ASTAR: print 'get_path start, end:', start, end
 
     while not frontier.is_empty():
 
-        # print 'get_path frontier:', frontier
+        if VERBOSE_ASTAR: print 'get_path frontier:', frontier
 
         current = frontier.remove()
         explored.add(current)
 
-        # print 'get_path current:', current
+        if VERBOSE_ASTAR: print 'get_path explored', explored
+
+        if VERBOSE_ASTAR: print 'get_path current:', current
 
         if (current == end):
-            # print 'Found end loc'
+            if VERBOSE_ASTAR: print 'Found end loc'
             break
         else:
             neighbors = get_neighboring_locs(current, board)
 
-            # print 'get_path neighbors:', neighbors
+            if VERBOSE_ASTAR: print 'get_path neighbors:', neighbors
 
             for n in neighbors:
-                if n not in moves and (board.passable(n) or n in (start, end)):
+                if n not in explored and (board.passable(n) or n in (start, end)):
                     moves[n] = moves[current] + MOVE_COST
                     frontier.insert(n, cost_estimate(n, end) + moves[n])
                     previous[n] = current
@@ -382,6 +398,6 @@ def get_path(start, end, board):
         path.append(previous[i])
         i = previous[i]
 
-    # path.reverse()
+    path.reverse()
 
     return path
