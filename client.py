@@ -5,10 +5,11 @@ import os
 import sys
 import requests
 import re
+import time
 from bot import RandomBot, SlowBot, NitorBot
 
 TIMEOUT=15
-MAP = 'm2'
+MAP = 'm1'
 
 vfName = 'viewgames.html'
 
@@ -92,9 +93,10 @@ def recordURL(viewUrl):
     if (vf == None):
         print('Error opening file: ', vf)
     else:
-        vf.write('<p><a href="' + viewUrl + '">' + viewUrl + '</a></p>')
+        vf.write('<p>' + time.asctime() + '  <a href="' + viewUrl + '">' + MAP.upper() + '</a></p>')
         vf.write("\n")
         vf.close()
+
 
 if __name__ == "__main__":
     if (len(sys.argv) < 4):
