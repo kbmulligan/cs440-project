@@ -13,6 +13,8 @@ from game import Game, Board
 from priorityqueue import PriorityQueue
 
 VERBOSE_ASTAR = False
+SHOW_CUSTOM_MAP = True
+SHOW_MAP_EVERY_X_TURNS = 1
 
 PLAYERS = 4
 HERO_IDs = ['1', '2', '3', '4']
@@ -67,7 +69,7 @@ class NitorBot(Bot):
     goal = 'EXPAND'
 
     # dest is coords of immediate goal destination
-    dest = ()
+    dest = None
     
     
     # called each turn, updates hero state, returns direction of movement hero bot chooses to go
@@ -77,9 +79,9 @@ class NitorBot(Bot):
         game = Game(state)
         self.update(game)
         
-        if (self.turn % 10 == 0):
+        if (self.turn % SHOW_MAP_EVERY_X_TURNS == 0):
             print ''
-            print_map(game)
+            print_map(game, SHOW_CUSTOM_MAP)
             # print game.state
         
         print ''
@@ -87,20 +89,23 @@ class NitorBot(Bot):
 
         direction = STAY
         
-        self.goal = self.determine_goal(game)
-        self.dest = self.determine_dest(self.goal, game)
-
+        
         if self.dest:                                       # Make progress toward destination
             self.mode = TRAVEL
             path = get_path(self.pos, self.dest, game.board)
+
             print 'Current path:', path
             next_loc = path[1]
             print 'Next move:', next_loc
 
             direction = self.get_dir_to(next_loc, game.board)
             print direction
+            if game.board.to(self.pos, direction) == self.dest:
+                self.dest = None
         
         else:
+            self.goal = self.determine_goal(game)
+            self.dest = self.determine_dest(self.goal, game)
             self.mode = WAIT
 
 
@@ -205,9 +210,6 @@ class NitorBot(Bot):
         # + '  Crashed: ' + str(self.crashed)
         # + ' \n--History: ' + str(history)
 
-
-
-        
     # returns list of positions of nearest 'obj' (from player) in state 'game' sorted from nearest to farthest
     def find_nearest_obj(self, obj, game):
         nearest = []
@@ -294,13 +296,17 @@ class SlowBot(Bot):
 def convert_line(line):
     newLine = []
 
+    TAVERN = 0
+    AIR = -1
+    WALL = -2
+
     for item in line:
-        if (item == -game.AIR):
+        if (item == AIR):
             newLine.append('..')
-        elif (item == game.WALL):
+        elif (item == WALL):
             newLine.append('XX')
         elif (item == TAVERN):
-            newLine.append('00')
+            newLine.append('[]')
         else:
             newLine.append(str(item))
 
@@ -309,8 +315,18 @@ def convert_line(line):
 # prints the game's depiction of the board, prints custom view if directed
 def print_map(game, customView=False):
         if customView:
+            columns = range(len(game.board.tiles))
+            columns = [str(x) for x in columns]
+            columns = [' ' + x if int(x) < 10 else x for x in columns ]
+
+            print '   ' + ''.join(columns)
+            row = 0
             for line in game.board.tiles:
-                print ''.join(convertLine(line))
+                srow = str(row)
+                if int(srow) < 10: srow = ' ' + srow
+                print srow + ' ' + ''.join(convert_line(line))
+                row += 1
+
         else:
             size = game.state['game']['board']['size']
             board = []
@@ -321,6 +337,7 @@ def print_map(game, customView=False):
             
             for line in board:
                 print line
+                
 
 # given a loc, return locs of all 4 neighboring cells, checks for borders
 def get_neighboring_locs(loc, board):
