@@ -11,7 +11,7 @@ class PriorityQueue:
         return len(self.queue)
 
     def __repr__(self):
-        return str(self.queue)
+        return [x for x in self.queue]
 
     def insert(self, item, score):
         self.queue.put((score, item))
@@ -29,8 +29,6 @@ class PriorityQueue:
         return self.queue.empty()
 
 
-
-#### TODO: Fix this. It overwrites valid data when told to insert on top of a score that is already present in the queue. ####
 
 if __name__ == '__main':
     q = PriorityQueue()
