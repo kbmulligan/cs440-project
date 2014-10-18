@@ -5,16 +5,16 @@ class PriorityQueue:
     queue = None
 
     def __init__(self):
-        self.queue = Queue.PriorityQueue()
+        self.queue = []
 
     def __len__(self):
         return len(self.queue)
 
     def __repr__(self):
-        return [x for x in self.queue]
+        return str(self.queue)
 
     def insert(self, item, score):
-        self.queue.put((score, item))
+        self.queue.append((score, item))
 
     def remove(self):
         """Returns and removes item with min score"""
@@ -22,11 +22,13 @@ class PriorityQueue:
             item = None
             print 'PriorityQueue: Tried to remove from empty queue!'
         else:
-            item = self.queue.get()[1]
+            scores = [x[0] for x in self.queue]
+            min_index = scores.index(min(scores))
+            item = self.queue.pop(min_index)[1]
         return item
 
     def is_empty(self):
-        return self.queue.empty()
+        return self.queue == []
 
 
 
