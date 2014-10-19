@@ -9,7 +9,7 @@ import time
 from bot import RandomBot, SlowBot, NitorBot
 
 TIMEOUT=15
-MAP = 'm1'
+MAP = 'm5'
 
 vfName = 'viewgames.html'
 
@@ -87,13 +87,17 @@ def start(server_url, key, mode, turns, bot):
     return viewURL
 
 
-def recordURL(viewUrl):
+def recordURL(viewUrl, mode):
     vf = open(vfName, 'a')
         
     if (vf == None):
         print('Error opening file: ', vf)
     else:
-        vf.write('<p>' + time.asctime() + '  <a href="' + viewUrl + '">' + MAP.upper() + '</a></p>')
+        if (mode == 'training'):
+            map_name = MAP.upper()
+        else:
+            map_name = 'ARENA'
+        vf.write('<p>' + time.asctime() + '  <a href="' + viewUrl + '">' + map_name + '</a></p>')
         vf.write("\n")
         vf.close()
 
@@ -119,8 +123,8 @@ if __name__ == "__main__":
             server_url = "http://vindinium.org"
 
         for i in range(number_of_games):
-            viewUrl = start(server_url, key, mode, number_of_turns, NitorBot())
+            viewUrl = start(server_url, key, mode, number_of_turns, RamBot())
             print("\nGame finished: %d/%d" % (i+1, number_of_games))
             
-        recordURL(viewUrl)
+        recordURL(viewUrl, mode)
         

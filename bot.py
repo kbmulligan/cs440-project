@@ -57,7 +57,7 @@ MOVE_COST = 1
 class Bot:
     pass
     
-class NitorBot(Bot):
+class RamBot(Bot):
 
     identity = 0
     turn = 0
