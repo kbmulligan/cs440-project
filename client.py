@@ -6,7 +6,7 @@ import sys
 import requests
 import re
 import time
-from bot import RandomBot, SlowBot, NitorBot
+from bot import RandomBot, SlowBot, RamBot
 
 TIMEOUT=15
 MAP = 'm5'
