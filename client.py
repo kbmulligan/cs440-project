@@ -6,7 +6,7 @@ import sys
 import requests
 import re
 import time
-from bot import RandomBot, SlowBot, RamBot
+from bot import RandomBot, SlowBot, RamBot, ManualBot
 
 TIMEOUT=15
 MAP = 'm5'
@@ -69,6 +69,8 @@ def start(server_url, key, mode, turns, bot):
     print("Playing at: " + state['viewUrl'])
     viewURL = state['viewUrl']
 
+    recordURL(viewURL, mode)
+
     while not is_finished(state):
         # Some nice output ;)
         sys.stdout.write('.')
@@ -123,8 +125,7 @@ if __name__ == "__main__":
             server_url = "http://vindinium.org"
 
         for i in range(number_of_games):
-            viewUrl = start(server_url, key, mode, number_of_turns, RamBot())
+            viewURL = start(server_url, key, mode, number_of_turns, RamBot())
             print("\nGame finished: %d/%d" % (i+1, number_of_games))
             
-        recordURL(viewUrl, mode)
         

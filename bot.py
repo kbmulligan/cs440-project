@@ -9,10 +9,10 @@
 
 import random
 import time
-from game import Game, Board
+from game import Game, Board, MineTile, HeroTile
 from priorityqueue import PriorityQueue
 
-BOT_NAME = 'nitorbot'
+BOT_NAME = 'rambot'
 
 VERBOSE_ASTAR = False
 SHOW_CUSTOM_MAP = True
@@ -39,7 +39,7 @@ WAIT = 'WAIT'
 TRAVEL = 'TRAVEL'
 
 TIME_THRESHOLD = 0.9
-STEPS_TO_DISPLAY = 9
+STEPS_TO_DISPLAY = 7
 
 
 LIFE_THRESHOLD = 70
@@ -51,7 +51,10 @@ MINES_TO_COMPARE = 3
 # for A*
 MOVE_COST = 1
 
-
+# for custom map printout
+AIR_TILE = '  '
+WALL_TILE = '##'
+TAVERN_TILE = '[]'
 
 
 class Bot:
@@ -79,8 +82,8 @@ class RamBot(Bot):
     # goal is one of ('EXPAND', 'DEFEND', 'HEAL', 'FIGHT', 'WANDER')
     goal = 'EXPAND'
 
-    # dest is coords of immediate goal destination
-    dest = None
+    # waypoints is list of coords of planned destinations, waypoints[0] is next immediate destination
+    waypoints = []
     
     
     # called each turn, updates hero state, returns direction of movement hero bot chooses to go
@@ -90,40 +93,39 @@ class RamBot(Bot):
         game = Game(state)
         self.update(game)
 
+        # print game info
         if (self.turn % SHOW_MAP_EVERY_X_TURNS == 0):
             print ''
-            print_map(game, SHOW_CUSTOM_MAP)
-            # print game.state
-        
-        print ''
+            print pretty_map(game, SHOW_CUSTOM_MAP)
+
         print self.summary()
 
-        direction = STAY
-        
-        if self.dest and self.life < FULL_HEALTH:           # Make progress toward destination or re-evaulate destination/goal
+        # Make progress toward destination or re-evaulate destination/goal
+        direction = None
+        if self.get_current_waypoint():
             
             self.mode = TRAVEL
 
-            path = get_path(self.pos, self.dest, game.board)
+            path = get_path(self.pos, self.get_current_waypoint(), game.board)
             print 'Current path:', path
             print 'Distance:', len(path) - 1
             
-            next_loc = path[1]
-            print 'Next move:', next_loc
+            next_pos = path[1]
+            print 'Next move:', next_pos
 
-            direction = self.get_dir_to(next_loc, game.board)
-            print direction
+            direction = self.get_dir_to(next_pos)
+            print 'Direction:', direction
 
-            if game.board.to(self.pos, direction) == self.dest:
-                self.dest = None
+            if game.board.to(self.pos, direction) == self.get_current_waypoint():
+                self.remove_current_waypoint()
         
         else:
             self.goal = self.determine_goal(game)
-            self.dest = self.determine_dest(self.goal, game)
-            self.mode = WAIT
+            self.add_waypoint(self.determine_dest(self.goal, game))
 
 
-        if direction == None:                               # Safety check -- I believe bad directions can cause HTTP 400 Errors - kbm
+        # Safety check -- I think bad dirs can cause HTTP 400 Errors - kbm
+        if direction == None:    
             direction = STAY
 
         td = time.time() - t0                               # Time check
@@ -165,6 +167,22 @@ class RamBot(Bot):
 
         return destination
 
+    def get_current_waypoint(self):
+        wpt = None
+        if any(self.waypoints):
+            wpt = self.waypoints[0]
+        return wpt
+
+    def remove_current_waypoint(self):
+        if any(self.waypoints):
+            self.waypoints.pop(0)
+
+    def remove_all_waypoints(self):
+        self.waypoints = []
+
+    def add_waypoint(self, wpt):
+        self.waypoints.append(wpt)
+
     def choose_best(self, locs):
         best = None
         if (locs):
@@ -184,11 +202,12 @@ class RamBot(Bot):
         return unowned_mines
 
     # returns direction to go based on destination coords 'dest'
-    def get_dir_to(self, dest, board):
+    def get_dir_to(self, dest):
         drow = dest[0] - self.pos[0]
         dcol = dest[1] - self.pos[1]
 
-        if (abs(drow) > abs(dcol)):               # if N/S is greater than E/W difference, the make the N/S change first
+        # if N/S is greater than E/W difference, the make the N/S change first
+        if (abs(drow) > abs(dcol)):               
             if (drow > 0):
                 d = SOUTH
             elif (drow < 0):
@@ -204,9 +223,6 @@ class RamBot(Bot):
                 d = STAY
 
         return d
-
-    def set_dest(self, newDest):
-        self.dest = newDest
 
     def set_goal(self, newGoal):
         self.goal = newGoal
@@ -230,6 +246,7 @@ class RamBot(Bot):
 
         if self.just_died():
             self.deaths += 1
+            self.remove_all_waypoints()
 
     def just_died(self):
         died = False
@@ -241,32 +258,35 @@ class RamBot(Bot):
         history = self.loc_history
         if (len(history) > STEPS_TO_DISPLAY):
             history = history[-STEPS_TO_DISPLAY:]
-        print 'History:', history
+        # print 'History:', history
 
-        return 'Turn: ' + str(self.turn) + '  pos: ' + str(self.pos) + '  $: ' + str(self.gold) + \
-             '  Life: ' + str(self.life) + '  Mines: ' + str(self.mineCount) + '  Dest: ' + str(self.dest) + \
-             '  Deaths: ' + str(self.deaths)
-        # + '  ID: ' + str(self.identity)
-        # + '  Crashed: ' + str(self.crashed)
-        # + ' \n--History: ' + str(history)
+        return 'Turn: ' + str(self.turn) + '  pos: ' + str(self.pos) + \
+            '  $: ' + str(self.gold) + '  Life: ' + str(self.life) + \
+            '  Mines: ' + str(self.mineCount) + \
+            '  Dest: ' + str(self.get_current_waypoint()) + \
+            '  Deaths: ' + str(self.deaths) + \
+            '\nHistory: ' + str(history)
+            # + '  ID: ' + str(self.identity)
+            # + '  Crashed: ' + str(self.crashed)
 
-    # returns list of positions of nearest 'obj' (from player) in state 'game' sorted from nearest to farthest
+    # returns list of positions of nearest 'obj' (from player) in state 'game' 
+    # sorted from nearest to farthest
     def find_nearest_obj(self, obj, game):
         nearest = []
         
         if (obj == 'mine'):
-            nearest = self.find_nearest_loc_from_pos(self.pos, game.mines_locs.keys(), game)
+            nearest = self.find_nearest_loc_from(self.pos, game.mines_locs.keys(), game)
         elif (obj == 'tavern'):
-            nearest = self.find_nearest_loc_from_pos(self.pos, game.taverns_locs, game)
+            nearest = self.find_nearest_loc_from(self.pos, game.taverns_locs, game)
         elif (obj == 'enemy'):
-            nearest = self.find_nearest_loc_from_pos(self.pos, game.heroes_locs.keys(), game)
+            nearest = self.find_nearest_loc_from(self.pos, game.heroes_locs.keys(), game)
         else:
             nearest = None
             print 'find_nearest_obj: invalid obj'
         return nearest
 
     # returns list of locations sorted in ascending distance from 'position'
-    def find_nearest_loc_from_pos(self, position, locations, game):
+    def find_nearest_loc_from(self, position, locations, game):
         locs = list(locations)
         nearest = []
 
@@ -284,7 +304,8 @@ class RamBot(Bot):
 
         return nearest
 
-    # given a location (coords) and game state returns the owner hero ID of the location or None if no owner exists
+    # given a location (coords) and game state, returns the owner hero ID of 
+    # the location or None if no owner exists
     def get_owner_id(self, loc, game):
 
         size = game.board.size
@@ -293,7 +314,7 @@ class RamBot(Bot):
         owner = tiles[loc[0]][loc[1]]
         ownerID = owner.__repr__()[1]
 
-        if (ownerID not in HERO_IDs):                   # safety check and correction
+        if (ownerID not in HERO_IDs):             # safety check and correction
             ownerID = None
         else:
             ownerID = int(ownerID)
@@ -326,7 +347,8 @@ class RamBot(Bot):
 
     
 
-
+########## STOCK BOTS #################
+# Useful for testing and troubleshooting
 class RandomBot(Bot):
     def move(self, state):
         game = Game(state)
@@ -339,6 +361,23 @@ class SlowBot(Bot):
         time.sleep(2)
         return choice(dirs)
 
+class ManualBot(Bot):                                        # Could not resist
+    def move(self, state):
+        print pretty_map(Game(state))
+        return self.to_dir(raw_input())
+
+    def to_dir(self, letter):
+        if (letter == 'w'):
+            direction = NORTH
+        elif (letter == 's'):
+            direction = SOUTH
+        elif (letter == 'a'):
+            direction = WEST
+        elif (letter == 'd'):
+            direction = EAST
+        else:
+            direction = STAY
+        return direction
 
 
 ########## UTILITY FUNCTIONS ##########
@@ -353,29 +392,31 @@ def convert_line(line):
 
     for item in line:
         if (item == AIR):
-            newLine.append('..')
+            newLine.append(AIR_TILE)
         elif (item == WALL):
-            newLine.append('XX')
+            newLine.append(WALL_TILE)
         elif (item == TAVERN):
-            newLine.append('[]')
+            newLine.append(TAVERN_TILE)
         else:
             newLine.append(str(item))
 
     return newLine
 
 # prints the game's depiction of the board, prints custom view if directed
-def print_map(game, customView=False):
+def pretty_map(game, customView=False):
+        output = ''
+
         if customView:
             columns = range(len(game.board.tiles))
             columns = [str(x) for x in columns]
             columns = [' ' + x if int(x) < 10 else x for x in columns ]
+            output += '   ' + ''.join(columns) + '\n'
 
-            print '   ' + ''.join(columns)
             row = 0
             for line in game.board.tiles:
                 srow = str(row)
                 if int(srow) < 10: srow = ' ' + srow
-                print srow + ' ' + ''.join(convert_line(line))
+                output += srow + ' ' + ''.join(convert_line(line)) + '\n'
                 row += 1
 
         else:
@@ -388,6 +429,8 @@ def print_map(game, customView=False):
             
             for line in board:
                 print line
+
+        return output
                 
 
 # given a loc, return locs of all 4 neighboring cells, checks for borders
