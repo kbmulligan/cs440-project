@@ -12,7 +12,7 @@ import time
 from game import Game, Board, MineTile, HeroTile
 from priorityqueue import PriorityQueue
 
-BOT_NAME = 'rambot'
+BOT_NAME = 'nitorbot'
 
 VERBOSE_ASTAR = False
 SHOW_CUSTOM_MAP = True
@@ -43,7 +43,7 @@ STEPS_TO_DISPLAY = 7
 
 
 LIFE_THRESHOLD = 70
-FULL_HEALTH = 100
+FULL_LIFE = 100
 
 MINES_TO_COMPARE = 3
 
@@ -58,16 +58,15 @@ TAVERN_TILE = '[]'
 
 
 class Bot:
-    pass
-    
-class RamBot(Bot):
-
     identity = 0
     turn = 0
     pos = ()
     life = 0
     gold = 0
     mineCount = 0
+    
+class RamBot(Bot):
+
     loc_history = []         # list of past coordinates in chronological order, i.e. [0] => start, [-1] => last turn
     deaths = 0
 
@@ -93,12 +92,17 @@ class RamBot(Bot):
         game = Game(state)
         self.update(game)
 
+        if self.turn <= 1:
+            self.determine_spawns(game)
+
         # print game info
         if (self.turn % SHOW_MAP_EVERY_X_TURNS == 0):
             print ''
             print pretty_map(game, SHOW_CUSTOM_MAP)
 
         print self.summary()
+
+        self.eval_nearby(game)
 
         # Make progress toward destination or re-evaulate destination/goal
         direction = None
@@ -167,6 +171,17 @@ class RamBot(Bot):
 
         return destination
 
+    def eval_nearby(self, game):
+        mine = self.choose_best(self.find_nearest_unowned_mines(game, MINES_TO_COMPARE))
+        if (self.life + path_cost(get_path(self.pos, mine, game.board))*2 > 85 and \
+            mine not in self.waypoints):
+            self.insert_immediate_waypoint(mine)
+        
+        near_tavern = self.find_nearest_obj('tavern', game)[0]  
+        if (self.missing_life() > path_cost(get_path(self.pos, near_tavern, game.board))*2 and \
+            near_tavern not in self.waypoints):
+            self.insert_immediate_waypoint(near_tavern)
+
     def get_current_waypoint(self):
         wpt = None
         if any(self.waypoints):
@@ -183,23 +198,10 @@ class RamBot(Bot):
     def add_waypoint(self, wpt):
         self.waypoints.append(wpt)
 
-    def choose_best(self, locs):
-        best = None
-        if (locs):
-            best = locs[0]
-        return best
+    def insert_immediate_waypoint(self, wpt):
+        self.waypoints.insert(0, wpt)
 
-    def find_nearest_unowned_mines(self, game, num):
-        mines = self.find_nearest_obj('mine', game)
-        owned = self.get_owned_by_id(mines, self.identity, game)
-        unowned = [mine for mine in mines if mine not in owned]
-
-        if (unowned):
-            unowned_mines = unowned[:num]
-        else:
-            unowned_mines = None
-
-        return unowned_mines
+    
 
     # returns direction to go based on destination coords 'dest'
     def get_dir_to(self, dest):
@@ -229,6 +231,9 @@ class RamBot(Bot):
 
     def healthy(self):
         return self.life > LIFE_THRESHOLD
+
+    def missing_life(self):
+        return FULL_LIFE - self.life
         
     # update self state vars
     def update(self, game):
@@ -247,6 +252,11 @@ class RamBot(Bot):
         if self.just_died():
             self.deaths += 1
             self.remove_all_waypoints()
+        
+        self.knowledge['GAME'] = game
+        self.knowledge['LEADER'] = game.get_leader_id()
+
+
 
     def just_died(self):
         died = False
@@ -265,9 +275,35 @@ class RamBot(Bot):
             '  Mines: ' + str(self.mineCount) + \
             '  Dest: ' + str(self.get_current_waypoint()) + \
             '  Deaths: ' + str(self.deaths) + \
-            '\nHistory: ' + str(history)
+            '\nHistory: ' + str(history) + \
+            '\nWpts: ' + str(self.waypoints)
+
             # + '  ID: ' + str(self.identity)
             # + '  Crashed: ' + str(self.crashed)
+
+
+    def choose_best(self, locs):
+        best = None
+        if (locs):
+            for loc in locs:
+                if self.get_owner_id(loc, self.knowledge['GAME']) == self.knowledge['LEADER']:
+                    best = loc
+                else:
+                    if best == None:
+                        best = locs[0]
+        return best
+
+    def find_nearest_unowned_mines(self, game, num):
+        mines = self.find_nearest_obj('mine', game)
+        owned = self.get_owned_by_id(mines, self.identity, game)
+        unowned = [mine for mine in mines if mine not in owned]
+
+        if (unowned):
+            unowned_mines = unowned[:num]
+        else:
+            unowned_mines = None
+
+        return unowned_mines
 
     # returns list of positions of nearest 'obj' (from player) in state 'game' 
     # sorted from nearest to farthest
@@ -333,7 +369,7 @@ class RamBot(Bot):
         locs = [x for x in game.heroes_locs.keys() if x != self.pos]
         return locs
 
-    def gather_knowledge(self, game):
+    def determine_spawns(self, game):
 
         for hero in game.heroes:
             if hero.name == BOT_NAME:
@@ -454,7 +490,7 @@ def get_neighboring_locs(loc, board):
 def get_distance(pos1, pos2):
     return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
 
-# returns heuristic adjustments for walking over things like spawn points or bots with high relative health
+# returns heuristic adjustments for walking over things like spawn points or bots with high relative life
 def penalties(pos, board):
     total = 0
 
