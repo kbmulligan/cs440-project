@@ -12,6 +12,8 @@ import time
 from game import Game, Board
 from priorityqueue import PriorityQueue
 
+BOT_NAME = 'nitorbot'
+
 VERBOSE_ASTAR = False
 SHOW_CUSTOM_MAP = True
 SHOW_MAP_EVERY_X_TURNS = 1
@@ -37,10 +39,14 @@ WAIT = 'WAIT'
 TRAVEL = 'TRAVEL'
 
 TIME_THRESHOLD = 0.9
+STEPS_TO_DISPLAY = 9
+
 
 LIFE_THRESHOLD = 70
+FULL_HEALTH = 100
 
-STEPS_TO_DISPLAY = 9
+MINES_TO_COMPARE = 3
+
 
 # for A*
 MOVE_COST = 1
@@ -59,8 +65,13 @@ class NitorBot(Bot):
     life = 0
     gold = 0
     mineCount = 0
-    locHistory = []      # list of past coordinates in chronological order, i.e. [0] => start, [-1] => last turn 
+    loc_history = []         # list of past coordinates in chronological order, i.e. [0] => start, [-1] => last turn
+    deaths = 0
 
+    knowledge = {}          # A dict with misc info in it. 
+                            # Keys used so far: 
+                            #   'ENEMY SPAWNS'
+                            #   'LEADER'
 
     # mode is one of ('WAIT', 'TRAVEL')
     mode = 'WAIT'
@@ -78,7 +89,7 @@ class NitorBot(Bot):
 
         game = Game(state)
         self.update(game)
-        
+
         if (self.turn % SHOW_MAP_EVERY_X_TURNS == 0):
             print ''
             print_map(game, SHOW_CUSTOM_MAP)
@@ -89,17 +100,20 @@ class NitorBot(Bot):
 
         direction = STAY
         
-        
-        if self.dest:                                       # Make progress toward destination
+        if self.dest and self.life < FULL_HEALTH:           # Make progress toward destination or re-evaulate destination/goal
+            
             self.mode = TRAVEL
-            path = get_path(self.pos, self.dest, game.board)
 
+            path = get_path(self.pos, self.dest, game.board)
             print 'Current path:', path
+            print 'Distance:', len(path) - 1
+            
             next_loc = path[1]
             print 'Next move:', next_loc
 
             direction = self.get_dir_to(next_loc, game.board)
             print direction
+
             if game.board.to(self.pos, direction) == self.dest:
                 self.dest = None
         
@@ -134,13 +148,8 @@ class NitorBot(Bot):
         destination = ()
 
         if goal == EXPAND:
-            mines = self.find_nearest_obj('mine', game)
-            owned = self.get_owned_by_id(mines, self.identity, game)
-            unowned = [mine for mine in mines if mine not in owned]
-
-            if (unowned):
-                destination = unowned[0]
-
+            nearest_mines = self.find_nearest_unowned_mines(game, MINES_TO_COMPARE)
+            destination = self.choose_best(nearest_mines)
         
         elif goal == DEFEND:
             destination = None
@@ -155,6 +164,24 @@ class NitorBot(Bot):
             destination = None
 
         return destination
+
+    def choose_best(self, locs):
+        best = None
+        if (locs):
+            best = locs[0]
+        return best
+
+    def find_nearest_unowned_mines(self, game, num):
+        mines = self.find_nearest_obj('mine', game)
+        owned = self.get_owned_by_id(mines, self.identity, game)
+        unowned = [mine for mine in mines if mine not in owned]
+
+        if (unowned):
+            unowned_mines = unowned[:num]
+        else:
+            unowned_mines = None
+
+        return unowned_mines
 
     # returns direction to go based on destination coords 'dest'
     def get_dir_to(self, dest, board):
@@ -183,29 +210,42 @@ class NitorBot(Bot):
 
     def set_goal(self, newGoal):
         self.goal = newGoal
+
+    def healthy(self):
+        return self.life > LIFE_THRESHOLD
         
     # update self state vars
     def update(self, game):
         self.turn = game.state['game']['turn'] / PLAYERS
         
         for hero in game.heroes:
-            if hero.name == 'nitorbot':
+            if hero.name == BOT_NAME:
                 self.gold = hero.gold
                 self.life = hero.life
                 self.pos = hero.pos['x'], hero.pos['y']
-                self.locHistory.append(self.pos)
+                self.loc_history.append(self.pos)
                 self.mineCount = hero.mineCount
                 self.crashed = hero.crashed
                 self.identity = hero.id
 
+        if self.just_died():
+            self.deaths += 1
+
+    def just_died(self):
+        died = False
+        if (len(self.loc_history) > 1):
+            died = get_distance(self.loc_history[-1], self.loc_history[-2]) > 1
+        return died
+
     def summary(self):
-        history = self.locHistory
+        history = self.loc_history
         if (len(history) > STEPS_TO_DISPLAY):
             history = history[-STEPS_TO_DISPLAY:]
-        # print 'History:', history
+        print 'History:', history
 
         return 'Turn: ' + str(self.turn) + '  pos: ' + str(self.pos) + '  $: ' + str(self.gold) + \
-             '  Life: ' + str(self.life) + '  Mines: ' + str(self.mineCount) + '  Dest: ' + str(self.dest)
+             '  Life: ' + str(self.life) + '  Mines: ' + str(self.mineCount) + '  Dest: ' + str(self.dest) + \
+             '  Deaths: ' + str(self.deaths)
         # + '  ID: ' + str(self.identity)
         # + '  Crashed: ' + str(self.crashed)
         # + ' \n--History: ' + str(history)
@@ -216,16 +256,13 @@ class NitorBot(Bot):
         
         if (obj == 'mine'):
             nearest = self.find_nearest_loc_from_pos(self.pos, game.mines_locs.keys(), game)
-  
         elif (obj == 'tavern'):
             nearest = self.find_nearest_loc_from_pos(self.pos, game.taverns_locs, game)
-
         elif (obj == 'enemy'):
-            notimplemented
-
+            nearest = self.find_nearest_loc_from_pos(self.pos, game.heroes_locs.keys(), game)
         else:
-            pass
-        
+            nearest = None
+            print 'find_nearest_obj: invalid obj'
         return nearest
 
     # returns list of locations sorted in ascending distance from 'position'
@@ -254,15 +291,12 @@ class NitorBot(Bot):
         tiles = game.board.tiles
 
         owner = tiles[loc[0]][loc[1]]
-        # owner = '@9'
-
         ownerID = owner.__repr__()[1]
 
         if (ownerID not in HERO_IDs):                   # safety check and correction
             ownerID = None
         else:
             ownerID = int(ownerID)
-
         return ownerID
 
     # given a list of mines and an ID, returns only those owned by ID
@@ -272,6 +306,23 @@ class NitorBot(Bot):
             if (self.get_owner_id(mine, game) == ID):
                 owned.append(mine)
         return owned
+
+    # return a tuple of enemy locs
+    def get_enemy_locations(self, game):
+        locs = [x for x in game.heroes_locs.keys() if x != self.pos]
+        return locs
+
+    def gather_knowledge(self, game):
+
+        for hero in game.heroes:
+            if hero.name == BOT_NAME:
+                self.spawn = hero.spawn
+
+        spawns = [hero.spawn for hero in game.heroes]
+        spawns = [x for x in spawns if x != self.spawn]
+        self.knowledge['ENEMY SPAWNS'] = spawns
+
+        return None
 
     
 
@@ -331,7 +382,7 @@ def print_map(game, customView=False):
             size = game.state['game']['board']['size']
             board = []
             for i in range(size):
-                begin = i*size*2
+                begin = i * size*2
                 end = begin + size*2
                 board.append(game.state['game']['board']['tiles'][begin:end])
             
@@ -360,10 +411,17 @@ def get_neighboring_locs(loc, board):
 def get_distance(pos1, pos2):
     return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
 
+# returns heuristic adjustments for walking over things like spawn points or bots with high relative health
+def penalties(pos, board):
+    total = 0
+
+
+    return total
 
 # cost estimate for A*, Manhattan distance heuristic
-def cost_estimate(n, end):
-    return get_distance(n, end)
+def cost_estimate(n, end, board):
+    return get_distance(n, end) + penalties(n, board)
+
 
 
 
@@ -379,7 +437,7 @@ def get_path(start, end, board):
     moves[start] = 0
 
     frontier = PriorityQueue()
-    frontier.insert(start, cost_estimate(start, end))
+    frontier.insert(start, cost_estimate(start, end, board))
 
     if VERBOSE_ASTAR: print 'get_path start, end:', start, end
 
@@ -405,7 +463,7 @@ def get_path(start, end, board):
             for n in neighbors:
                 if n not in explored and (board.passable(n) or n in (start, end)):
                     moves[n] = moves[current] + MOVE_COST
-                    frontier.insert(n, cost_estimate(n, end) + moves[n])
+                    frontier.insert(n, cost_estimate(n, end, board) + moves[n])
                     previous[n] = current
 
     # found goal, now reconstruct path
@@ -418,3 +476,7 @@ def get_path(start, end, board):
     path.reverse()
 
     return path
+
+# returns the length of the path in moves
+def path_cost(path):
+    return len(path) - 1
