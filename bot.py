@@ -45,6 +45,8 @@ STEPS_TO_DISPLAY = 7
 LIFE_THRESHOLD = 70
 FULL_LIFE = 100
 
+BEER_COST = 2
+
 MINES_TO_COMPARE = 3
 
 
@@ -142,9 +144,9 @@ class RamBot(Bot):
     def determine_goal (self, game):
         goal = None
 
-        goal = EXPAND                                       # default goal is to expand
+        goal = EXPAND                                       # default
 
-        if (self.life < LIFE_THRESHOLD):                    # healing overrides other goals if necessary
+        if (self.life < LIFE_THRESHOLD and self.can_buy()): # healing override
             goal = HEAL
 
         return goal
@@ -179,7 +181,7 @@ class RamBot(Bot):
         
         near_tavern = self.find_nearest_obj('tavern', game)[0]  
         if (self.missing_life() > path_cost(get_path(self.pos, near_tavern, game.board))*2 and \
-            near_tavern not in self.waypoints):
+            near_tavern not in self.waypoints and self.can_buy()):
             self.insert_immediate_waypoint(near_tavern)
 
     def get_current_waypoint(self):
@@ -234,6 +236,9 @@ class RamBot(Bot):
 
     def missing_life(self):
         return FULL_LIFE - self.life
+
+    def can_buy(self):
+        return self.gold >= BEER_COST
         
     # update self state vars
     def update(self, game):
