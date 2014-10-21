@@ -9,6 +9,7 @@
 
 import random
 import time
+import sys
 from game import Game, Board, MineTile, HeroTile
 from priorityqueue import PriorityQueue
 
@@ -52,6 +53,10 @@ MINES_TO_COMPARE = 3
 
 # for A*
 MOVE_COST = 1
+MOVE_PENALTY = {'SPAWN POINT': 10, 
+                'ENEMY': 5, 
+                'ADJ ENEMY':3,
+                'PROHIBITED': 100}
 
 # for custom map printout
 AIR_TILE = '  '
@@ -74,6 +79,7 @@ class RamBot(Bot):
 
     knowledge = {}          # A dict with misc info in it. 
                             # Keys used so far: 
+                            #   'GAME'
                             #   'ENEMY SPAWNS'
                             #   'LEADER'
 
@@ -104,7 +110,7 @@ class RamBot(Bot):
 
         print self.summary()
 
-        self.eval_nearby(game)
+        # self.eval_nearby(game)
 
         # Make progress toward destination or re-evaulate destination/goal
         direction = None
@@ -112,7 +118,7 @@ class RamBot(Bot):
             
             self.mode = TRAVEL
 
-            path = get_path(self.pos, self.get_current_waypoint(), game.board)
+            path = get_path(self.pos, self.get_current_waypoint(), game.board, self.path_heuristic)
             print 'Current path:', path
             print 'Distance:', len(path) - 1
             
@@ -137,6 +143,8 @@ class RamBot(Bot):
         td = time.time() - t0                               # Time check
         if (td > TIME_THRESHOLD):
             print "Close on time!!!", td
+
+        print 'Response time: %.3f' % td
 
         return direction
 
@@ -175,14 +183,16 @@ class RamBot(Bot):
 
     def eval_nearby(self, game):
         mine = self.choose_best(self.find_nearest_unowned_mines(game, MINES_TO_COMPARE))
-        if (self.life + path_cost(get_path(self.pos, mine, game.board))*2 > 85 and \
+        if (self.life - path_cost(get_path(self.pos, mine, game.board, self.path_heuristic))*2 > 85 and \
             mine not in self.waypoints):
             self.insert_immediate_waypoint(mine)
         
         near_tavern = self.find_nearest_obj('tavern', game)[0]  
-        if (self.missing_life() > path_cost(get_path(self.pos, near_tavern, game.board))*2 and \
+        if (self.life + path_cost(get_path(self.pos, near_tavern, game.board, self.path_heuristic)) < LIFE_THRESHOLD and \
             near_tavern not in self.waypoints and self.can_buy()):
             self.insert_immediate_waypoint(near_tavern)
+            if (self.life - path_cost(get_path(self.pos, near_tavern, game.board, self.path_heuristic)) < FULL_LIFE / 2):
+                self.insert_immediate_waypoint(near_tavern)
 
     def get_current_waypoint(self):
         wpt = None
@@ -198,6 +208,8 @@ class RamBot(Bot):
         self.waypoints = []
 
     def add_waypoint(self, wpt):
+        # wpts = list(add_wpt)
+        # for wpt in wpts:
         self.waypoints.append(wpt)
 
     def insert_immediate_waypoint(self, wpt):
@@ -289,14 +301,44 @@ class RamBot(Bot):
 
     def choose_best(self, locs):
         best = None
-        if (locs):
-            for loc in locs:
-                if self.get_owner_id(loc, self.knowledge['GAME']) == self.knowledge['LEADER']:
-                    best = loc
-                else:
-                    if best == None:
-                        best = locs[0]
+        q = PriorityQueue()
+
+        print 'choose best, locs:', locs
+
+        for loc in locs:
+            q.insert(loc, -self.score_loc(loc))     # by highest score
+        best = q.remove()
+
+        print 'choose best, best:', best
+
         return best
+
+    def score_loc(self, loc):
+        score = 0
+        score += -len(get_path(self.pos, loc, self.knowledge['GAME'].board, self.path_heuristic))
+        
+        if (self.get_owner_id(loc, self.knowledge['GAME']) in HERO_IDs):
+            score += 5
+
+        return score
+
+
+    # returns list of locs sorted by path length (A*)
+    def nearest_by_path(self, locs):
+        nearest = []
+        for x in range(len(locs)):
+            closest_loc = ()
+            shortest_dist = sys.maxint
+
+            for i in range(len(locs)):
+                dist = len(get_path(self.pos, locs[i], self.knowledge['GAME'].board, self.path_heuristic))
+                if (dist < shortest_dist):
+                    shortest_dist = dist
+                    closest_loc = tuple(locs[i])
+            nearest.append(closest_loc)
+            locs.pop(locs.index(closest_loc))
+        return nearest
+
 
     def find_nearest_unowned_mines(self, game, num):
         mines = self.find_nearest_obj('mine', game)
@@ -311,7 +353,7 @@ class RamBot(Bot):
         return unowned_mines
 
     # returns list of positions of nearest 'obj' (from player) in state 'game' 
-    # sorted from nearest to farthest
+    # sorted from nearest to farthest (Manhattan)
     def find_nearest_obj(self, obj, game):
         nearest = []
         
@@ -326,7 +368,7 @@ class RamBot(Bot):
             print 'find_nearest_obj: invalid obj'
         return nearest
 
-    # returns list of locations sorted in ascending distance from 'position'
+    # returns list of locations sorted in ascending path_distance from 'position'
     def find_nearest_loc_from(self, position, locations, game):
         locs = list(locations)
         nearest = []
@@ -385,6 +427,40 @@ class RamBot(Bot):
         self.knowledge['ENEMY SPAWNS'] = spawns
 
         return None
+    
+
+    # cost estimate for A*, Manhattan distance heuristic
+    def path_heuristic(self, n, end):
+        return get_distance(n, end) + self.penalties(n)
+
+    # returns heuristic adjustments for walking over things like spawn points or bots with high relative life
+    def penalties(self, pos):
+        total = 0
+
+        board = self.knowledge['GAME'].board
+        enemy_locs = [x for x in self.knowledge['GAME'].heroes_locs if x != self.pos]
+        enemy_spawns = self.knowledge['ENEMY SPAWNS']
+
+        if pos in enemy_spawns:
+            total += MOVE_PENALTY['SPAWN POINT']
+
+        if pos in enemy_locs:
+            total += MOVE_PENALTY['ENEMY']
+
+        adj_hero = []
+        for loc in enemy_locs:
+            for here in get_neighboring_locs(loc, board):
+                adj_hero.append(here)
+
+        if pos in adj_hero:
+            total += MOVE_PENALTY['ADJ ENEMY']
+
+        if self.loc_history[-20:].count(pos) > 5:
+            total += MOVE_PENALTY['PROHIBITED']
+
+        return total
+
+    
 
     
 
@@ -495,24 +571,13 @@ def get_neighboring_locs(loc, board):
 def get_distance(pos1, pos2):
     return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
 
-# returns heuristic adjustments for walking over things like spawn points or bots with high relative life
-def penalties(pos, board):
-    total = 0
-
-
-    return total
-
-# cost estimate for A*, Manhattan distance heuristic
-def cost_estimate(n, end, board):
-    return get_distance(n, end) + penalties(n, board)
-
-
-
 
 # use A* to find the shortest path between two points
 # returns list of coords from start to end, not including start
 # disregards heroes in the way
-def get_path(start, end, board):
+# cost_estimate is a heuristic function that takes only start and
+# end locations as arguments
+def get_path(start, end, board, cost_estimate):
 
     explored = set()
     previous = {}
@@ -521,7 +586,7 @@ def get_path(start, end, board):
     moves[start] = 0
 
     frontier = PriorityQueue()
-    frontier.insert(start, cost_estimate(start, end, board))
+    frontier.insert(start, cost_estimate(start, end))
 
     if VERBOSE_ASTAR: print 'get_path start, end:', start, end
 
@@ -547,7 +612,7 @@ def get_path(start, end, board):
             for n in neighbors:
                 if n not in explored and (board.passable(n) or n in (start, end)):
                     moves[n] = moves[current] + MOVE_COST
-                    frontier.insert(n, cost_estimate(n, end, board) + moves[n])
+                    frontier.insert(n, cost_estimate(n, end) + moves[n])
                     previous[n] = current
 
     # found goal, now reconstruct path
