@@ -46,8 +46,17 @@ class Game:
                     self.heroes_locs[(row, col)] = obj.id
                 elif (obj == TAVERN):
                     self.taverns_locs.add((row, col))
-
-
+                    
+    def get_leader_id(self):
+        maxId = 1
+        maxGold = -1
+        
+        for hero in self.heroes:
+            if hero.gold > maxGold:
+                maxId = hero.id
+                maxGold = hero.gold
+                
+        return maxId   
 
 class Board:
     def __parseTile(self, string):
@@ -107,4 +116,5 @@ class Hero:
         self.mineCount = hero['mineCount']
         self.crashed = hero['crashed']
         self.id = hero['id']
+        self.spawn = hero['spawnPos']
 

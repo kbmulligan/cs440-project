@@ -106,26 +106,27 @@ def recordURL(viewUrl, mode):
 
 if __name__ == "__main__":
     if (len(sys.argv) < 4):
-        print("Usage: %s <key> <[training|arena]> <number-of-games|number-of-turns> [server-url]" % (sys.argv[0]))
-        print('Example: %s mySecretKey training 20' % (sys.argv[0]))
+        print("Usage: %s <key> <publicName> <[training|arena]> <number-of-games|number-of-turns> [server-url]" % (sys.argv[0]))
+        print('Example: %s mySecretKey myBotName training 20' % (sys.argv[0]))
     else:
         key = sys.argv[1]
-        mode = sys.argv[2]
+        botName = sys.argv[2]
+        mode = sys.argv[3]
 
         if(mode == "training"):
             number_of_games = 1
-            number_of_turns = int(sys.argv[3])
+            number_of_turns = int(sys.argv[4])
         else: 
-            number_of_games = int(sys.argv[3])
+            number_of_games = int(sys.argv[4])
             number_of_turns = 300 # Ignored in arena mode
 
-        if(len(sys.argv) == 5):
-            server_url = sys.argv[4]
+        if(len(sys.argv) == 6):
+            server_url = sys.argv[5]
         else:
             server_url = "http://vindinium.org"
 
         for i in range(number_of_games):
-            viewURL = start(server_url, key, mode, number_of_turns, RamBot())
+            viewURL = start(server_url, key, mode, number_of_turns, RamBot(botName))
             print("\nGame finished: %d/%d" % (i+1, number_of_games))
             
         

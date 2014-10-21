@@ -86,6 +86,10 @@ class RamBot(Bot):
     # waypoints is list of coords of planned destinations, waypoints[0] is next immediate destination
     waypoints = []
     
+    def __init__(self, name=BOT_NAME):
+        self.spawn = None
+        self.name = name
+    
     
     # called each turn, updates hero state, returns direction of movement hero bot chooses to go
     def move(self, state):
@@ -245,7 +249,7 @@ class RamBot(Bot):
         self.turn = game.state['game']['turn'] / PLAYERS
         
         for hero in game.heroes:
-            if hero.name == BOT_NAME:
+            if hero.name == self.name:
                 self.gold = hero.gold
                 self.life = hero.life
                 self.pos = hero.pos['x'], hero.pos['y']
@@ -377,7 +381,7 @@ class RamBot(Bot):
     def determine_spawns(self, game):
 
         for hero in game.heroes:
-            if hero.name == BOT_NAME:
+            if hero.name == self.name:
                 self.spawn = hero.spawn
 
         spawns = [hero.spawn for hero in game.heroes]
@@ -394,13 +398,13 @@ class RandomBot(Bot):
     def move(self, state):
         game = Game(state)
         dirs = ['Stay', 'North', 'South', 'East', 'West']
-        return choice(dirs)
+#         return choice(dirs)
 
 class SlowBot(Bot):
     def move(self, state):
         dirs = ['Stay', 'North', 'South', 'East', 'West']
         time.sleep(2)
-        return choice(dirs)
+#         return choice(dirs)
 
 class ManualBot(Bot):                                        # Could not resist
     def move(self, state):
