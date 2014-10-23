@@ -101,7 +101,7 @@ class RamBot(Bot):
     def move(self, state):
         t0 = time.time()
 
-        game = Game(state)
+        game = Game(state, self.name)
         self.update(game)
 
         if self.turn <= 1:
@@ -269,6 +269,9 @@ class RamBot(Bot):
                 self.mineCount = hero.mineCount
                 self.crashed = hero.crashed
                 self.identity = hero.id
+                
+                #kick out of loop after finding your own info - sr
+                break
 
         if self.just_died():
             self.deaths += 1
