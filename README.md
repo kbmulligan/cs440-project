@@ -10,15 +10,14 @@ Install deps:
 
 Run with:
 
-    python client.py <key> arena <number-of-games-to-play> [server-url]
-    python client.py <key> training <number-of-turns-to-play> [server-url]
+    python client.py <key> <publicName> arena <number-of-games-to-play> [server-url]
+    python client.py <key> <publicName> training <number-of-turns-to-play> [server-url]
 
 Examples:
 
-    python client.py mySecretKey arena 3
-    python client.py mySecretKey training 50
+    python client.py mySecretKey myBotName arena 3
+    python client.py mySecretKey myBotName training 50
 
 Notes:
 
-    Currently, the bot name in bot.py must match the associated bot name for 
-    the key used for the code to run.
+    BOTNAME must be passed in as argument
