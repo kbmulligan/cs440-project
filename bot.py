@@ -16,7 +16,7 @@ from priorityqueue import PriorityQueue
 BOT_NAME = 'nitorbot'
 
 VERBOSE_ASTAR = False
-SHOW_CUSTOM_MAP = True
+SHOW_CUSTOM_MAP = False
 SHOW_MAP_EVERY_X_TURNS = 1
 
 PLAYERS = 4
@@ -465,6 +465,9 @@ class RamBot(Bot):
         if self.loc_history[-20:].count(pos) > 5:
             total += MOVE_PENALTY['PROHIBITED']
 
+        unpassable = [x for x in get_neighboring_locs(pos, board) if not board.passable(x)]
+        total += len(unpassable)
+
         return total
 
     
@@ -549,13 +552,10 @@ def pretty_map(game, customView=False):
             for i in range(size):
                 begin = i * size*2
                 end = begin + size*2
-                board.append(game.state['game']['board']['tiles'][begin:end])
+                output += game.state['game']['board']['tiles'][begin:end] + '\n'
             
-            for line in board:
-                print line
 
         return output
-                
 
 # given a loc, return locs of all 4 neighboring cells, checks for borders
 def get_neighboring_locs(loc, board):
