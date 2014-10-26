@@ -1,4 +1,5 @@
 import re
+from time import time
 
 TAVERN = 0
 AIR = -1
@@ -30,46 +31,48 @@ class MineTile:
         return 'M' + str(self.heroId)
 
 class Game:
-    def __init__(self, state, myHeroName):
+    def __init__(self, state, myHeroName, parseBoard=True):
         self.state = state
-        self.board = Board(state['game']['board'])
+        
         self.heroes = [Hero(state['game']['heroes'][i]) for i in range(len(state['game']['heroes']))]
         
         self.myHeroName = myHeroName
-        self.myHeroId = 0
-        
+        self.myHero = None 
         #get my heroid
         for hero in self.heroes:
             if hero.name == myHeroName:
                 self.myHeroId = hero.id
+                self.myHero = hero
                 break # get out of this loop now
         
-        self.mines_locs = {}
-        self.others_mines_locs={}
-        
-        self.heroes_locs = {}
-        self.other_heroes_locs = {}
-        
-        self.taverns_locs = set([])
-        for row in range(len(self.board.tiles)):
-            for col in range(len(self.board.tiles[row])):
-                obj = self.board.tiles[row][col]
-                if isinstance(obj, MineTile):
-                    self.mines_locs[(row, col)] = obj.heroId
-                    
-                    #if not mine, add to 'others' list
-                    if obj.heroId != self.myHeroId:
-                        self.others_mines_locs[(row,col)] = obj.heroId
-                    
-                elif isinstance(obj, HeroTile):
-                    self.heroes_locs[(row, col)] = obj.id
-                    
-                    #if not me, add to others list
-                    if obj.id != self.myHeroId:
-                        self.other_heroes_locs[(row,col)] = obj.id
-
-                elif (obj == TAVERN):
-                    self.taverns_locs.add((row, col))
+        if parseBoard:
+            self.board = Board(state['game']['board'])
+            self.mines_locs = {}
+            self.others_mines_locs={}
+            
+            self.heroes_locs = {}
+            self.other_heroes_locs = {}
+            
+            self.taverns_locs = set([])
+            for row in range(len(self.board.tiles)):
+                for col in range(len(self.board.tiles[row])):
+                    obj = self.board.tiles[row][col]
+                    if isinstance(obj, MineTile):
+                        self.mines_locs[(row, col)] = obj.heroId
+                        
+                        #if not mine, add to 'others' list
+                        if obj.heroId != str(self.myHeroId):
+                            self.others_mines_locs[(row,col)] = obj.heroId
+                        
+                    elif isinstance(obj, HeroTile):
+                        self.heroes_locs[(row, col)] = obj.id
+                        
+                        #if not me, add to others list
+                        if obj.id != self.myHeroId:
+                            self.other_heroes_locs[(row,col)] = obj.id
+    
+                    elif (obj == TAVERN):
+                        self.taverns_locs.add((row, col))
                     
     def get_leader_id(self):
         maxId = 1

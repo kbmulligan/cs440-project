@@ -12,6 +12,7 @@ import time
 import sys
 from game import Game, Board, MineTile, HeroTile
 from priorityqueue import PriorityQueue
+from minimax import Vindinium, alphabeta_search, HEAL_ACTION
 
 BOT_NAME = 'nitorbot'
 
@@ -87,7 +88,7 @@ class RamBot(Bot):
     mode = 'WAIT'
 
     # goal is one of ('EXPAND', 'DEFEND', 'HEAL', 'FIGHT', 'WANDER')
-    goal = 'EXPAND'
+    goal = ('EXPAND')
 
     # waypoints is list of coords of planned destinations, waypoints[0] is next immediate destination
     waypoints = []
@@ -95,6 +96,7 @@ class RamBot(Bot):
     def __init__(self, name=BOT_NAME):
         self.spawn = None
         self.name = name
+        self.lastAction = None
     
     
     # called each turn, updates hero state, returns direction of movement hero bot chooses to go
@@ -117,8 +119,13 @@ class RamBot(Bot):
         # self.eval_nearby(game)
 
         # Make progress toward destination or re-evaulate destination/goal
-        direction = None
+        direction = STAY 
         if self.get_current_waypoint():
+            
+            #if health is low, go heal
+            if game.myHero.life < 30:
+                self.remove_all_waypoints()
+                self.add_waypoint(self.determine_dest(HEAL, game))
             
             self.mode = TRAVEL
 
@@ -126,23 +133,30 @@ class RamBot(Bot):
             print 'Current path:', path
             print 'Distance:', len(path) - 1
             
-            next_pos = path[1]
-            print 'Next move:', next_pos
-
-            direction = self.get_dir_to(next_pos)
-            print 'Direction:', direction
-
+            #index error on occasion. not sure if this is the best fix
+            if len(path) > 1:
+                next_pos = path[1]
+                print 'Next move:', next_pos
+    
+                direction = self.get_dir_to(next_pos)
+                print 'Direction:', direction
+    
             if game.board.to(self.pos, direction) == self.get_current_waypoint():
                 self.remove_current_waypoint()
         
         else:
-            self.goal = self.determine_goal(game)
-            self.add_waypoint(self.determine_dest(self.goal, game))
-
+            self.goal = self.determine_goal(game, state)
+            print "executing goal: " + str(self.goal)
+            
+            if self.goal[0] == HEAL:
+                self.add_waypoint(self.determine_dest(HEAL, game))
+            else:
+                self.add_waypoint((self.goal[1][0], self.goal[1][1]))
 
         # Safety check -- I think bad dirs can cause HTTP 400 Errors - kbm
-        if direction == None:    
-            direction = STAY
+        #moved default value for direction to creation of var
+#         if direction == None:    
+#             direction = STAY
 
         td = time.time() - t0                               # Time check
         if (td > TIME_THRESHOLD):
@@ -153,13 +167,27 @@ class RamBot(Bot):
         return direction
 
     # returns goal based on game state
-    def determine_goal (self, game):
+    def determine_goal (self, game, state):
         goal = None
+        
+        miniMax = Vindinium(game.myHeroName, state)
+        miniAction = alphabeta_search(miniMax, d=10)
+        
+        lowerLifeThres = 40
+        
+        if miniAction[0] == HEAL_ACTION or (self.life < lowerLifeThres and self.can_buy()) or (self.lastAction != None and self.lastAction[0] == HEAL_ACTION and self.life < 80):
+            #HEAL if life is low, and heal if you just healed, and life isn't high enough
+            goal = (HEAL, 0)
+        else:
+            goal = miniAction
+            
+        self.lastAction = goal
 
-        goal = EXPAND                                       # default
+        """goal = EXPAND                                       # default
 
         if (self.life < LIFE_THRESHOLD and self.can_buy()): # healing override
             goal = HEAL
+            """
 
         return goal
 

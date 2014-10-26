@@ -9,16 +9,16 @@ import time
 from bot import RandomBot, SlowBot, RamBot, ManualBot
 
 TIMEOUT=15
-MAP = 'm5'
+MAP = 'm4'
 
 vfName = 'viewgames.html'
 
-def get_new_game_state(session, server_url, key, mode='training', number_of_turns = 10):
+def get_new_game_state(session, server_url, key, mode='training', number_of_turns = 10, mapId=MAP):
     """Get a JSON from the server containing the current state of the game"""
 
     if(mode=='training'):
         #Don't pass the 'map' parameter if you want a random map
-        params = { 'key': key, 'turns': number_of_turns, 'map': MAP}
+        params = { 'key': key, 'turns': number_of_turns, 'map': mapId}
         api_endpoint = '/api/training'
     elif(mode=='arena'):
         params = { 'key': key}
