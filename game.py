@@ -108,10 +108,10 @@ class Board:
         self.tiles = self.__parseTiles(board['tiles'])
 
     def passable(self, loc):
-        """True if can walk through. NOTE: This will return True even if occupied by another player."""
+        """True if bot can walk through."""
         x, y = loc
         pos = self.tiles[x][y]
-        return (pos != WALL) and (pos != TAVERN) and not isinstance(pos, MineTile)
+        return (pos != WALL) and (pos != TAVERN) and not isinstance(pos, MineTile) and not isinstance(pos, HeroTile)
 
     def passables(self, locs):
         return [x for x in locs if (self.passable(x))]
