@@ -32,27 +32,43 @@ class MineTile:
 
 class Game:
     def __init__(self, state, myHeroName, parseBoard=True):
-        self.state = state
+        
+        self.turn = state['game']['turn']
+        self.maxTurns = state['game']['maxTurns']
         
         self.heroes = [Hero(state['game']['heroes'][i]) for i in range(len(state['game']['heroes']))]
         
         self.myHeroName = myHeroName
         self.myHero = None 
+        
+        self.heroes_locs = {}
+        self.other_heroes_locs = {}
+        
         #get my heroid
         for hero in self.heroes:
+            #setup all hero locations
+#             self.heroes_locs[(hero.pos['y'], hero.pos['x'])] = hero.id
+
             if hero.name == myHeroName:
                 self.myHeroId = hero.id
                 self.myHero = hero
-                break # get out of this loop now
+            else:
+                #populate other_heroes_loc
+#                 self.other_heroes_locs[(hero.pos['y'], hero.pos['x'])] = hero.id
+                pass
         
         if parseBoard:
+            startParse = time()
+
             self.board = Board(state['game']['board'])
             self.mines_locs = {}
             self.others_mines_locs={}
             
-            self.heroes_locs = {}
-            self.other_heroes_locs = {}
             
+            
+            state['game']['board']['mines'] = {}
+            state['game']['board']['taverns'] = []
+
             self.taverns_locs = set([])
             for row in range(len(self.board.tiles)):
                 for col in range(len(self.board.tiles[row])):
@@ -64,15 +80,26 @@ class Game:
                         if obj.heroId != str(self.myHeroId):
                             self.others_mines_locs[(row,col)] = obj.heroId
                         
+                        state['game']['board']['mines'][(row, col)] = obj.heroId
+                    
+                    elif (obj == TAVERN):
+                        self.taverns_locs.add((row, col))
+                        state['game']['board']['taverns'].append((row, col))
+
+#                     """
                     elif isinstance(obj, HeroTile):
                         self.heroes_locs[(row, col)] = obj.id
                         
                         #if not me, add to others list
-                        if obj.id != self.myHeroId:
+                        if obj.id != str(self.myHeroId):
                             self.other_heroes_locs[(row,col)] = obj.id
-    
-                    elif (obj == TAVERN):
-                        self.taverns_locs.add((row, col))
+#                     """
+            
+            endParse = time() - startParse
+            print "parseTime: " + str(endParse)
+                        
+        
+        self.state = state
                     
     def get_leader_id(self):
         maxId = 1
@@ -114,7 +141,10 @@ class Board:
         """True if can walk through. NOTE: This will return True even if occupied by another player."""
         x, y = loc
         pos = self.tiles[x][y]
-        return (pos != WALL) and (pos != TAVERN) and not isinstance(pos, MineTile)
+        #have players block path
+#         ispassable = (pos != WALL) and (pos != TAVERN) and not isinstance(pos, MineTile) and not isinstance(pos, HeroTile)
+        ispassable = (pos != WALL) and (pos != TAVERN) and not isinstance(pos, MineTile)
+        return ispassable 
 
     def passables(self, locs):
         return [x for x in locs if (self.passable(x))]

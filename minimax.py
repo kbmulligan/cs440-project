@@ -7,8 +7,9 @@ from russell/norvig aima games.py
 '''
 from utils import argmax, infinity
 from game import Game
-from math import ceil
+from math import ceil, log
 from time import time
+from copy import deepcopy
 
 STAY_ACTION = 'STAY'
 ATTACK_TROLL_ACTION = 'ATTACK_TROLL'
@@ -61,22 +62,32 @@ class Vindinium(MiniMaxGame):
     def to_move(self):
         return self.myHeroName
     
-    def actions(self, state):
+    def actions(self, state, parseBoard=False):
         availActions = list()
         
         #put stay in 
         #availActions.append((STAY_ACTION,0))
-       
-        #parse game object
-        game = Game(state, self.myHeroName)
+        
+        #get id for who's turn it is
+        globalTurn = state['game']['turn']
+        
+        playerId = (globalTurn % 4) 
+        playerName = state['game']['heroes'][playerId ]['name']
+        
+        #parse game object and get moves for other chars
+        game = Game(state, playerName, parseBoard)
          
         #go over other people's mines, and create actions for those
-        for minePos, ownerId in game.others_mines_locs.iteritems():
-            availActions.append((ATTACK_TROLL_ACTION, minePos))
+#         for minePos, ownerId in game.others_mines_locs.iteritems():
+        for minePos, ownerId in game.state['game']['board']['mines'].iteritems():
+            if ownerId != str(playerId + 1):
+                availActions.append((ATTACK_TROLL_ACTION, minePos, ownerId))
             
         #do the same for adversaries
-        for opPos, opId in game.other_heroes_locs.iteritems():
-            availActions.append((ATTACK_PLAYER_ACTION, opPos, opId))
+#         for opPos, opId in game.other_heroes_locs.iteritems():
+        for hero in game.state['game']['heroes']:
+            if hero['id'] != (playerId + 1):
+                availActions.append((ATTACK_PLAYER_ACTION, (hero['pos']['y'], hero['pos']['x']), hero['id']))
             
         """#actions for health
         for barPos in game.taverns_locs:
@@ -85,13 +96,26 @@ class Vindinium(MiniMaxGame):
         
         return availActions
                             
-    def result(self, state, move):
+    def result(self, initState, move):
+        
+        state = deepcopy(initState)
+        
+        
+        #store this move in game.lastAction
+        state['game']['lastAction'] = str(move)
         
         moveAction = move[0]
         
+        #get id for who's turn it is
+        globalTurn = state['game']['turn']
+        playerId = (globalTurn % 4) 
+        playerName = state['game']['heroes'][playerId ]['name']
+        
         #parse state
-        game = Game(state, self.myHeroName, False)
-        myHeroPos = state['game']['heroes'][game.myHeroId -1]['pos']
+        game = Game(state, playerName, False)
+        myHeroPos = state['game']['heroes'][playerId]['pos']
+        
+        numMoves = 0
         
         if moveAction == STAY_ACTION:
             #result of stay is lose one health, and gain 1 gold per mine owned
@@ -99,25 +123,37 @@ class Vindinium(MiniMaxGame):
             newGold = game.myHero.gold + game.myHero.mineCount
             
             #update state
-            state['game']['heroes'][game.myHeroId -1]['gold'] = newGold
-            state['game']['heroes'][game.myHeroId -1]['life'] = newHealth
+            state['game']['heroes'][playerId]['gold'] = newGold
+            state['game']['heroes'][playerId]['life'] = newHealth
             
         elif moveAction == ATTACK_TROLL_ACTION:
             #get troll pos
             trollPos = move[1]
+            ownerId = move[2]
             
             #calculate number of moves to location
-            numMoves = self.calculateNumberOfMoves((myHeroPos['x'], myHeroPos['y']), trollPos)
+            numMoves = self.calculateNumberOfMoves((myHeroPos['y'], myHeroPos['x']), trollPos)
             
-            #adjust health for fight with troll
-            newLife = game.myHero.life - 20
-            newGold = game.myHero.gold
+            #adjust health for fight with troll and trip
+            newLife = game.myHero.life - 20 - 5 #5 is a hard coded number to take into account moves from health fill up to fight
             newMines = game.myHero.mineCount
+
+            #account for gold earned on the trip there
+            newGold = game.myHero.gold + (numMoves * newMines)
             
             if newLife > 0:
                 #victory increase # mines and gold 
                 newMines = newMines + 1
                 newGold = newGold + newMines
+                
+                #update owner's minecount, if previously owned
+                if str(ownerId) != '-':
+                    ownerIdInt = int(ownerId)
+                    state['game']['heroes'][ownerIdInt - 1]['mineCount'] = state['game']['heroes'][ownerIdInt - 1]['mineCount'] -1  
+                    
+                #change owner in
+                state['game']['board']['mines'][trollPos] = str(playerId + 1)
+                
             else:
                 #died fighting troll
                 #life and mineCount go to zero
@@ -125,68 +161,88 @@ class Vindinium(MiniMaxGame):
                 newMines = 0
                 
             #update state
-            state['game']['heroes'][game.myHeroId -1]['gold'] = newGold
-            state['game']['heroes'][game.myHeroId -1]['mineCount'] = newMines
-            state['game']['heroes'][game.myHeroId -1]['life'] = newLife
-            state['game']['heroes'][game.myHeroId -1]['pos']['x'] = trollPos[0]
-            state['game']['heroes'][game.myHeroId -1]['pos']['y'] = trollPos[1]
+            state['game']['heroes'][playerId]['gold'] = newGold
+            state['game']['heroes'][playerId]['mineCount'] = newMines
+            state['game']['heroes'][playerId]['life'] = newLife
+            state['game']['heroes'][playerId]['pos']['y'] = trollPos[0]
+            state['game']['heroes'][playerId]['pos']['x'] = trollPos[1]
+            
+            #TODO change map value
             
             
         elif moveAction == ATTACK_PLAYER_ACTION:
             
             playerPos = move[1]
-            playerId = int(move[2])
+            opponentId = int(move[2])
             
             #calculate number of moves to location
-            numMoves = self.calculateNumberOfMoves((myHeroPos['x'], myHeroPos['y']), playerPos)
+            numMoves = self.calculateNumberOfMoves((myHeroPos['y'], myHeroPos['x']), playerPos)
+           
+            #min number of moves is 1
+            if numMoves == 0:
+                numMoves = 1
             
-            #adjust health for trip
             lifeAfterMoves = game.myHero.life - numMoves
             
-            #adjust health for fight with troll
             newLife = 0
             newMines = game.myHero.mineCount
-            newGold = game.myHero.gold
-           
-            playerHealth = state['game']['heroes'][playerId -1]['life']
             
-            if lifeAfterMoves <= 20 or lifeAfterMoves < playerHealth:
+            #assuming we survive the trip there, we get numMoves*numMines gold
+            newGold = game.myHero.gold + (numMoves * int(state['game']['heroes'][playerId]['mineCount']))
+           
+            oppenentHealth = state['game']['heroes'][opponentId - 1]['life']
+            
+#             if lifeAfterMoves <= 20 or lifeAfterMoves < oppenentHealth:
+            if lifeAfterMoves < oppenentHealth:
                 #assume hero dies if starting life is 20 or less
                 #or if his life is less than opponent
                 newLife = 0
 
-            elif lifeAfterMoves > playerHealth:
+            elif lifeAfterMoves > oppenentHealth:
                 #our hero has > 20 health and greater than player, should win battle
                 #this calculation isn't totally accurate. doesn't take into account if myHero
                 #attacks first. this is more conservative
-                newLife = lifeAfterMoves - ceil(playerHealth/20.0) * 20
+                newLife = lifeAfterMoves - ceil(oppenentHealth/20.0) * 20
                 
             #claim the mines if hero won    
             if newLife > 0:
                 #incr. num mines by how many were taken from other player
-                addtlMineIfWonFight = state['game']['heroes'][game.myHeroId -1]['mineCount']
+                addtlMineIfWonFight = state['game']['heroes'][opponentId - 1]['mineCount']
                 newMines = newMines + addtlMineIfWonFight
                 
                 #addtl gold for being alive at end of turn
                 newGold = newGold + newMines
+
+                #set their mine count to 0
+                state['game']['heroes'][opponentId - 1]['mineCount'] = 0
+                
+                #move our position to their location
+                state['game']['heroes'][game.myHeroId -1]['pos']['y'] = playerPos[0]
+                state['game']['heroes'][game.myHeroId -1]['pos']['x'] = playerPos[1]
                 
             else:
                 #lost life and all the mines
                 newLife = 0
                 newMines = 0
                 
+                #give player our mines
+                state['game']['heroes'][opponentId - 1]['mineCount'] = state['game']['heroes'][opponentId - 1]['mineCount'] + game.myHero.mineCount
+                
+                #move back to respawn
+                state['game']['heroes'][game.myHeroId -1]['pos']['x'] = state['game']['heroes'][game.myHeroId -1]['spawnPos']['x'] 
+                state['game']['heroes'][game.myHeroId -1]['pos']['y'] = state['game']['heroes'][game.myHeroId -1]['spawnPos']['y']
+                
             #update state
             state['game']['heroes'][game.myHeroId -1]['gold'] = newGold
             state['game']['heroes'][game.myHeroId -1]['mineCount'] = newMines
             state['game']['heroes'][game.myHeroId -1]['life'] = newLife
-            state['game']['heroes'][game.myHeroId -1]['pos']['x'] = playerPos[0]
-            state['game']['heroes'][game.myHeroId -1]['pos']['y'] = playerPos[1]
+            
             
         else:
             #heal
             barPos = move[1]
             
-            movesToBar = self.calculateNumberOfMoves((myHeroPos['x'], myHeroPos['y']), barPos)
+            movesToBar = self.calculateNumberOfMoves((myHeroPos['y'], myHeroPos['x']), barPos)
             
             lifeAfterMove = game.myHero.life - movesToBar
             
@@ -208,17 +264,31 @@ class Vindinium(MiniMaxGame):
             state['game']['heroes'][game.myHeroId -1]['pos']['x'] = barPos[0]
             state['game']['heroes'][game.myHeroId -1]['pos']['y'] = barPos[1]
             
+        #update gold for all other heroes in game
+        for hero in game.heroes:
+            if hero.id != game.myHeroId:
+                state['game']['heroes'][hero.id - 1]['gold'] = (hero.gold + hero.mineCount)
+        
+        #update numMoves
+        try:     
+            state['game']['heroes'][game.myHeroId -1]['numMoves'] = state['game']['heroes'][game.myHeroId -1]['numMoves'] + numMoves
+        except:
+            state['game']['heroes'][game.myHeroId -1]['numMoves'] = numMoves
+        
+        #update turn count
+        state['game']['turn'] = globalTurn + 1
+            
         return state
     
     def terminal_test(self, state):
         "Return True if this is a final state for the game."
-        #terminal state going to be on a per life basis initially
+        #terminal state going to be when turn# == maxTurns
         retVal = False
         
-        game = Game(state, self.myHeroName)
+        game = Game(state, self.myHeroName, parseBoard=False)
         
         #if myHero's life is 0 or less, it's a terminal state
-        if game.myHero.life <= 0:
+        if game.state['game']['finished'] == "True":
             retVal = True
             
         return retVal
@@ -227,26 +297,55 @@ class Vindinium(MiniMaxGame):
         "Return the value of this final state to player."
         #value is going to be the amount of utility
         
-        game = Game(state, self.myHeroName)
+#         game = Game(state, self.myHeroName, parseBoard=False)
         
-        utility = 0
-        
-        for hero in game.heroes:
-            if hero.name == player:
-                utility = hero.gold
+#         if game.myHero.life <= 0:
+#             utility = -infinity
+#         else:
+
+        playerId = -1
+            
+        othersGoldCount = []
+        for hero in state['game']['heroes']:
+            if hero['name'] != player:
+                othersGoldCount.append(hero['gold'])
                 #add amount of life to utility
-                utility = utility + hero.life
-                break;
+            else:
+                #get this player's id
+                playerId = int(hero['id'])
+                
+        oppenentMaxMine = sum(othersGoldCount)
+       
+        numMovesToGetHere = state['game']['heroes'][playerId -1 ]['numMoves']
+        
+        reduceMoves = 0
+        
+        if numMovesToGetHere != 0:
+            reduceMoves = log(int(numMovesToGetHere))
+        
+        utility = (state['game']['heroes'][playerId -1]['gold'] - oppenentMaxMine) - reduceMoves
+#         utility = utility * -1
         return utility
     
     def calculateNumberOfMoves(self, curPos, destPos):
         #this is the number of moves assuming no obstacles
-        xDiff = abs(curPos[0] - destPos[0])
-        yDiff = abs(curPos[1] - destPos[1])
+        yDiff = abs(curPos[0] - destPos[0])
+        xDiff = abs(curPos[1] - destPos[1])
         
         totalNumMoves = xDiff + yDiff
         
         return totalNumMoves
+    
+def pretty_map(game):
+        output = ''
+
+        size = game.state['game']['board']['size']
+        for i in range(size):
+            begin = i * size*2
+            end = begin + size*2
+            output += game.state['game']['board']['tiles'][begin:end] + '\n'
+
+        return output
         
         
     
@@ -255,15 +354,18 @@ def alphabeta_search(miniMaxGame, d=4, cutoff_test=None, eval_fn=None):
     This version cuts off search and uses an evaluation function."""
 
     player = miniMaxGame.myHeroName
-    state = miniMaxGame.initial
+    initialState = miniMaxGame.initial
+#     state = miniMaxGame.initial
 
     def max_value(state, alpha, beta, depth):
         if cutoff_test(state, depth):
-            return eval_fn(state)
+            evalVal = eval_fn(state) 
+            return evalVal
         v = -infinity
-        for a in miniMaxGame.actions(state):
-            v = max(v, min_value(miniMaxGame.result(state, a),
-                                 alpha, beta, depth+1))
+        actionList = miniMaxGame.actions(state)
+        for a in actionList:
+            newState = miniMaxGame.result(state, a)
+            v = max(v, min_value(newState, alpha, beta, depth+1))
             if v >= beta:
                 return v
             alpha = max(alpha, v)
@@ -271,21 +373,37 @@ def alphabeta_search(miniMaxGame, d=4, cutoff_test=None, eval_fn=None):
 
     def min_value(state, alpha, beta, depth):
         if cutoff_test(state, depth):
-            return eval_fn(state)
+            evalVal = eval_fn(state) 
+            return evalVal
         v = infinity
-        for a in miniMaxGame.actions(state):
-            v = min(v, max_value(miniMaxGame.result(state, a),
-                                 alpha, beta, depth+1))
+        actionList = miniMaxGame.actions(state) 
+        for a in actionList:
+            newState = miniMaxGame.result(state, a)
+            v = min(v, max_value(newState, alpha, beta, depth+1))
             if v <= alpha:
                 return v
             beta = min(beta, v)
         return v
+    
+    def argMaxMinVal(action):
+        newState = miniMaxGame.result(initialState, action)
+#         print "action : " + str(action) + "'s result:"
+#         print pretty_map(Game(newState, miniMaxGame.myHeroName))
+        minVal = min_value(newState, -infinity, infinity, 0)
+        
+        return minVal
 
     # Body of alphabeta_search starts here:
     # The default test cuts off at depth d or at a terminal state
     cutoff_test = (cutoff_test or
                    (lambda state,depth: depth>d or miniMaxGame.terminal_test(state)))
     eval_fn = eval_fn or (lambda state: miniMaxGame.utility(state, player))
-    return argmax(miniMaxGame.actions(state),
-                  lambda a: min_value(miniMaxGame.result(state, a),
-                                      -infinity, infinity, 0))
+    
+    actionList = miniMaxGame.actions(miniMaxGame.initial, True)
+    print "actionList: " + str(actionList)
+#     return argmax(actionList,
+#                   lambda a: min_value(miniMaxGame.result(miniMaxGame.initial, a),
+#                                       -infinity, infinity, 0))
+    maxArg = argmax(actionList, argMaxMinVal)
+    return maxArg
+    

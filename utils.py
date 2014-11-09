@@ -371,11 +371,16 @@ def argmin(seq, fn):
     >>> argmin(['one', 'to', 'three'], len)
     'to'
     """
-    best = seq[0]; best_score = fn(best)
+    best = seq[0] 
+#     best_score = fn(best)
+    best_score = infinity
+    
     for x in seq:
         x_score = fn(x)
+        print str(x) + "'s score: " + str(x_score)
         if x_score < best_score:
             best, best_score = x, x_score
+    print "best: " + str(best) + " score: " + str(best_score)
     return best
 
 def argmin_list(seq, fn):
@@ -411,7 +416,8 @@ def argmax(seq, fn):
     >>> argmax(['one', 'to', 'three'], len)
     'three'
     """
-    return argmin(seq, lambda x: -fn(x))
+    maxVal = argmin(seq, lambda x: -fn(x))
+    return maxVal
 
 def argmax_list(seq, fn):
     """Return a list of elements of seq[i] with the highest fn(seq[i]) scores.

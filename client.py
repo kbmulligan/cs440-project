@@ -68,6 +68,8 @@ def start(server_url, key, mode, turns, bot):
     state = get_new_game_state(session, server_url, key, mode, turns)
     print("Playing at: " + state['viewUrl'])
     viewURL = state['viewUrl']
+    
+    print ("init game state: " + str(state))
 
     recordURL(viewURL, mode)
 

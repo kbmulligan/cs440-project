@@ -67,6 +67,7 @@ TAVERN_TILE = '[]'
 
 class Bot:
     identity = 0
+    globalTurn = 0
     turn = 0
     pos = ()
     life = 0
@@ -120,6 +121,19 @@ class RamBot(Bot):
 
         # Make progress toward destination or re-evaulate destination/goal
         direction = STAY 
+        
+        #reeval goal every time
+        self.goal = self.determine_goal(game, state)
+        print "executing goal: " + str(self.goal)
+        
+        #clear all waypoints
+        self.remove_all_waypoints()
+       
+        if self.goal[0] == HEAL:
+            self.add_waypoint(self.determine_dest(HEAL, game))
+        else:
+            self.add_waypoint((self.goal[1][0], self.goal[1][1]))
+        
         if self.get_current_waypoint():
             
             #if health is low, go heal
@@ -145,6 +159,7 @@ class RamBot(Bot):
                 self.remove_current_waypoint()
         
         else:
+            """
             self.goal = self.determine_goal(game, state)
             print "executing goal: " + str(self.goal)
             
@@ -152,6 +167,7 @@ class RamBot(Bot):
                 self.add_waypoint(self.determine_dest(HEAL, game))
             else:
                 self.add_waypoint((self.goal[1][0], self.goal[1][1]))
+            """
 
         # Safety check -- I think bad dirs can cause HTTP 400 Errors - kbm
         #moved default value for direction to creation of var
@@ -171,7 +187,7 @@ class RamBot(Bot):
         goal = None
         
         miniMax = Vindinium(game.myHeroName, state)
-        miniAction = alphabeta_search(miniMax, d=10)
+        miniAction = alphabeta_search(miniMax, d=1)
         
         lowerLifeThres = 40
         
@@ -287,6 +303,7 @@ class RamBot(Bot):
     # update self state vars
     def update(self, game):
         self.turn = game.state['game']['turn'] / PLAYERS
+        self.globalTurn = game.state['game']['turn']
         
         for hero in game.heroes:
             if hero.name == self.name:
@@ -322,7 +339,7 @@ class RamBot(Bot):
             history = history[-STEPS_TO_DISPLAY:]
         # print 'History:', history
 
-        return 'Turn: ' + str(self.turn) + '  pos: ' + str(self.pos) + \
+        return 'Id: ' + str(self.identity) + ' Turn: ' + str(self.turn) + '/' + str(self.globalTurn) + '  pos: ' + str(self.pos) + \
             '  $: ' + str(self.gold) + '  Life: ' + str(self.life) + \
             '  Mines: ' + str(self.mineCount) + \
             '  Dest: ' + str(self.get_current_waypoint()) + \
