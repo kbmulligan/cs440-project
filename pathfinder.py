@@ -85,9 +85,8 @@ class Pathfinder():
             current = frontier.remove()
             explored.add(current)
 
-            if VERBOSE_ASTAR: print 'get_path explored', explored
-
-            if VERBOSE_ASTAR: print 'get_path current:', current
+            if VERBOSE_ASTAR: print 'get_path explored set', explored
+            if VERBOSE_ASTAR: print 'get_path current pos:', current
 
             if (current == end):
                 if VERBOSE_ASTAR: print 'Found end loc'
@@ -107,8 +106,13 @@ class Pathfinder():
         i = end
         path = [i]
         while i != start:
-            path.append(previous[i])
-            i = previous[i]
+            if (i in previous):
+                path.append(previous[i])
+                i = previous[i]
+            else:
+                print 'get_path error: probably could not find a valid path from', start, 'to', end
+                path = [start, start]           # return something valid
+                break
 
         path.reverse()
 
