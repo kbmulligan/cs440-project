@@ -90,7 +90,8 @@ def start(server_url, key, mode, turns, bot):
 
 
 def recordURL(viewUrl, mode):
-    vf = open(vfName, 'a')
+    vf = open(vfName, 'r+')
+    data = []
         
     if (vf == None):
         print('Error opening file: ', vf)
@@ -99,8 +100,17 @@ def recordURL(viewUrl, mode):
             map_name = MAP.upper()
         else:
             map_name = 'ARENA'
-        vf.write('<p>' + time.asctime() + '  <a href="' + viewUrl + '">' + map_name + '</a></p>')
-        vf.write("\n")
+
+        data.append('<p>' + time.asctime() + '  <a href="' + viewUrl + '">' + map_name + '</a></p>\n')
+        
+        for line in vf:
+            data.append(line)
+
+        vf.seek(0)
+
+        for line in data:
+            vf.write(line)
+
         vf.close()
 
 
