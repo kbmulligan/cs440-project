@@ -12,6 +12,7 @@ import time
 import sys
 from game import Game, Board, MineTile, HeroTile
 from priorityqueue import PriorityQueue
+import pathfinder
 
 BOT_NAME = 'nitorbot'
 
@@ -92,9 +93,12 @@ class RamBot(Bot):
     # waypoints is list of coords of planned destinations, waypoints[0] is next immediate destination
     waypoints = []
     
+    
+    
     def __init__(self, name=BOT_NAME):
         self.spawn = None
         self.name = name
+        self.pf = pathfinder.Pathfinder()
     
     
     # called each turn, updates hero state, returns direction of movement hero bot chooses to go
@@ -122,7 +126,7 @@ class RamBot(Bot):
             
             self.mode = TRAVEL
 
-            path = get_path(self.pos, self.get_current_waypoint(), game.board, self.path_heuristic)
+            path = self.pf.get_path(self.pos, self.get_current_waypoint(), game.board, self.path_heuristic)
             print 'Current path:', path
             print 'Distance:', len(path) - 1
             
@@ -187,15 +191,15 @@ class RamBot(Bot):
 
     def eval_nearby(self, game):
         mine = self.choose_best(self.find_nearest_unowned_mines(game, MINES_TO_COMPARE))
-        if (self.life - path_cost(get_path(self.pos, mine, game.board, self.path_heuristic))*2 > 85 and \
+        if (self.life - self.pf.path_cost(self.pf.get_path(self.pos, mine, game.board, self.path_heuristic))*2 > 85 and \
             mine not in self.waypoints):
             self.insert_immediate_waypoint(mine)
         
         near_tavern = self.find_nearest_obj('tavern', game)[0]  
-        if (self.life + path_cost(get_path(self.pos, near_tavern, game.board, self.path_heuristic)) < LIFE_THRESHOLD and \
+        if (self.life + self.pf.path_cost(self.pf.get_path(self.pos, near_tavern, game.board, self.path_heuristic)) < LIFE_THRESHOLD and \
             near_tavern not in self.waypoints and self.can_buy()):
             self.insert_immediate_waypoint(near_tavern)
-            if (self.life - path_cost(get_path(self.pos, near_tavern, game.board, self.path_heuristic)) < FULL_LIFE / 2):
+            if (self.life - self.pf.path_cost(self.pf.get_path(self.pos, near_tavern, game.board, self.path_heuristic)) < FULL_LIFE / 2):
                 self.insert_immediate_waypoint(near_tavern)
 
     def get_current_waypoint(self):
@@ -322,7 +326,7 @@ class RamBot(Bot):
 
     def score_loc(self, loc):
         score = 0
-        score += -len(get_path(self.pos, loc, self.knowledge['GAME'].board, self.path_heuristic))
+        score += -len(self.pf.get_path(self.pos, loc, self.knowledge['GAME'].board, self.path_heuristic))
         
         if (self.get_owner_id(loc, self.knowledge['GAME']) in HERO_IDs):
             score += 5
@@ -338,7 +342,7 @@ class RamBot(Bot):
             shortest_dist = sys.maxint
 
             for i in range(len(locs)):
-                dist = len(get_path(self.pos, locs[i], self.knowledge['GAME'].board, self.path_heuristic))
+                dist = len(self.pf.get_path(self.pos, locs[i], self.knowledge['GAME'].board, self.path_heuristic))
                 if (dist < shortest_dist):
                     shortest_dist = dist
                     closest_loc = tuple(locs[i])
@@ -456,7 +460,7 @@ class RamBot(Bot):
 
         adj_hero = []
         for loc in enemy_locs:
-            for here in get_neighboring_locs(loc, board):
+            for here in pathfinder.get_neighboring_locs(loc, board):
                 adj_hero.append(here)
 
         if pos in adj_hero:
@@ -465,15 +469,13 @@ class RamBot(Bot):
         if self.loc_history[-20:].count(pos) > 5:
             total += MOVE_PENALTY['PROHIBITED']
 
-        unpassable = [x for x in get_neighboring_locs(pos, board) if not board.passable(x)]
+        unpassable = [x for x in pathfinder.get_neighboring_locs(pos, board) if not board.passable(x)]
         total += len(unpassable)
 
         return total
 
-    
-
-    
-
+        
+        
 ########## STOCK BOTS #################
 # Useful for testing and troubleshooting
 class RandomBot(Bot):
@@ -557,82 +559,7 @@ def pretty_map(game, customView=False):
 
         return output
 
-# given a loc, return locs of all 4 neighboring cells, checks for borders
-def get_neighboring_locs(loc, board):
-    x, y = loc
-    locs = []
-
-    above = (x - 1, y)
-    below = (x + 1, y)
-    left =  (x, y - 1)
-    right = (x, y + 1)
-
-    if (x > 0):                 locs.append(above)
-    if (x < board.size - 1):    locs.append(below)
-    if (y > 0):                 locs.append(left)
-    if (y < board.size - 1):    locs.append(right)
-
-    return locs
-
 # returns Manhattan distance from pos1 to pos2
 def get_distance(pos1, pos2):
     return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
 
-
-# use A* to find the shortest path between two points
-# returns list of coords from start to end, not including start
-# disregards heroes in the way
-# cost_estimate is a heuristic function that takes only start and
-# end locations as arguments
-def get_path(start, end, board, cost_estimate):
-
-    explored = set()
-    previous = {}
-    previous[start] = None
-    moves = {}
-    moves[start] = 0
-
-    frontier = PriorityQueue()
-    frontier.insert(start, cost_estimate(start, end))
-
-    if VERBOSE_ASTAR: print 'get_path start, end:', start, end
-
-    while not frontier.is_empty():
-
-        if VERBOSE_ASTAR: print 'get_path frontier:', frontier
-
-        current = frontier.remove()
-        explored.add(current)
-
-        if VERBOSE_ASTAR: print 'get_path explored', explored
-
-        if VERBOSE_ASTAR: print 'get_path current:', current
-
-        if (current == end):
-            if VERBOSE_ASTAR: print 'Found end loc'
-            break
-        else:
-            neighbors = get_neighboring_locs(current, board)
-
-            if VERBOSE_ASTAR: print 'get_path neighbors:', neighbors
-
-            for n in neighbors:
-                if n not in explored and (board.passable(n) or n in (start, end)):
-                    moves[n] = moves[current] + MOVE_COST
-                    frontier.insert(n, cost_estimate(n, end) + moves[n])
-                    previous[n] = current
-
-    # found goal, now reconstruct path
-    i = end
-    path = [i]
-    while i != start:
-        path.append(previous[i])
-        i = previous[i]
-
-    path.reverse()
-
-    return path
-
-# returns the length of the path in moves
-def path_cost(path):
-    return len(path) - 1
