@@ -13,11 +13,12 @@ import sys
 from game import Game, Board, MineTile, HeroTile
 from priorityqueue import PriorityQueue
 import pathfinder
+import compare
 
 BOT_NAME = 'nitorbot'
 
 VERBOSE_ASTAR = False
-SHOW_CUSTOM_MAP = False
+SHOW_CUSTOM_MAP = True
 SHOW_MAP_EVERY_X_TURNS = 1
 
 PLAYERS = 4
@@ -72,6 +73,7 @@ class Bot:
     life = 0
     gold = 0
     mineCount = 0
+    moves = {}
     
 class RamBot(Bot):
 
@@ -99,6 +101,11 @@ class RamBot(Bot):
         self.spawn = None
         self.name = name
         self.pf = pathfinder.Pathfinder()
+        self.moves[STAY] = 0
+        self.moves[NORTH] = 0
+        self.moves[SOUTH] = 0
+        self.moves[EAST] = 0
+        self.moves[WEST] = 0
     
     
     # called each turn, updates hero state, returns direction of movement hero bot chooses to go
@@ -117,35 +124,43 @@ class RamBot(Bot):
             print pretty_map(game, SHOW_CUSTOM_MAP)
 
         print self.summary()
-
+        print 'Minecounts:'
+        print '1', compare.get_mine_count(1, game)
+        print '2', compare.get_mine_count(2, game)
+        print '3', compare.get_mine_count(3, game)
+        print '4', compare.get_mine_count(4, game)
+        if STAY in self.moves: print 'Times not moved:', self.moves[STAY]
+        
         # self.eval_nearby(game)
 
-        # Make progress toward destination or re-evaulate destination/goal
-        direction = None
-        if self.get_current_waypoint():
-            
-            self.mode = TRAVEL
-
-            path = self.pf.get_path(self.pos, self.get_current_waypoint(), game.board, self.path_heuristic)
-            print 'Current path:', path
-            print 'Distance:', len(path) - 1
-            
-            next_pos = path[1]
-            print 'Next move:', next_pos
-
-            direction = self.get_dir_to(next_pos)
-            print 'Direction:', direction
-
-            if game.board.to(self.pos, direction) == self.get_current_waypoint():
-                self.remove_current_waypoint()
         
-        else:
+        direction = None
+        
+        if self.get_current_waypoint() == None:
             self.goal = self.determine_goal(game)
             self.add_waypoint(self.determine_dest(self.goal, game))
+            
+        self.mode = TRAVEL
+        
+        # Make progress toward destination
+        path = self.pf.get_path(self.pos, self.get_current_waypoint(), game.board, self.path_heuristic)
+        print 'Current path:', path
+        print 'Distance:', len(path) - 1
+        
+        next_pos = path[1]
+        print 'Next move:', next_pos
+
+        direction = self.get_dir_to(next_pos)
+        print 'Direction:', direction
+
+        if game.board.to(self.pos, direction) == self.get_current_waypoint():
+            self.remove_current_waypoint()
+            
 
 
         # Safety check -- I think bad dirs can cause HTTP 400 Errors - kbm
-        if direction == None:    
+        if direction == None:
+            print 'Direction was None!!!'
             direction = STAY
 
         td = time.time() - t0                               # Time check
@@ -154,6 +169,7 @@ class RamBot(Bot):
 
         print 'Response time: %.3f' % td
 
+        self.record(direction)                              # track all moves
         return direction
 
     # returns goal based on game state
@@ -284,6 +300,8 @@ class RamBot(Bot):
         self.knowledge['GAME'] = game
         self.knowledge['LEADER'] = game.get_leader_id()
 
+    def record(self, dir):
+        self.moves[dir] += 1
 
 
     def just_died(self):
@@ -558,7 +576,7 @@ def pretty_map(game, customView=False):
             
 
         return output
-
+        
 # returns Manhattan distance from pos1 to pos2
 def get_distance(pos1, pos2):
     return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
