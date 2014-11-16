@@ -7,10 +7,13 @@
 # Dr. Asa Ben-Hur
 #################################################
 
+import time
 from game import Game, Board, MineTile, HeroTile
 from priorityqueue import PriorityQueue
 
 VERBOSE_ASTAR = False
+
+PATHFINDER_TIMEOUT = 0.8
 
 PLAYERS = 4
 HERO_IDs = ['1', '2', '3', '4']
@@ -66,6 +69,8 @@ class Pathfinder():
     # cost_estimate is a heuristic function that takes only start and
     # end locations as arguments
     def get_path(self, start, end, board, cost_estimate=get_distance):
+    
+        t0 = time.time()
 
         explored = set()
         previous = {}
@@ -79,6 +84,11 @@ class Pathfinder():
         if VERBOSE_ASTAR: print 'get_path start, end:', start, end
 
         while not frontier.is_empty():
+        
+            if (t0 - time.time() > PATHFINDER_TIMEOUT):
+                print 'PATHFINDING TIMEOUT: Averting disconnect...'
+                print '    get_path: Probably could not find a valid path from', start, 'to', end
+                return [start, start] 
 
             if VERBOSE_ASTAR: print 'get_path frontier:', frontier
 

@@ -124,16 +124,9 @@ class RamBot(Bot):
             print pretty_map(game, SHOW_CUSTOM_MAP)
 
         print self.summary()
-        print 'Minecounts:'
-        print '1', compare.get_mine_count(1, game)
-        print '2', compare.get_mine_count(2, game)
-        print '3', compare.get_mine_count(3, game)
-        print '4', compare.get_mine_count(4, game)
-        if STAY in self.moves: print 'Times not moved:', self.moves[STAY]
-        
+
         # self.eval_nearby(game)
 
-        
         direction = None
         
         if self.get_current_waypoint() == None:
@@ -147,7 +140,10 @@ class RamBot(Bot):
         print 'Current path:', path
         print 'Distance:', len(path) - 1
         
-        next_pos = path[1]
+        if len(path) > 1: 
+            next_pos = path[1]
+        else:
+            next_pos = self.pos
         print 'Next move:', next_pos
 
         direction = self.get_dir_to(next_pos)
@@ -157,6 +153,8 @@ class RamBot(Bot):
             self.remove_current_waypoint()
             
 
+        print ''
+        self.print_comparison_tests(game)
 
         # Safety check -- I think bad dirs can cause HTTP 400 Errors - kbm
         if direction == None:
@@ -169,14 +167,41 @@ class RamBot(Bot):
 
         print 'Response time: %.3f' % td
 
-        self.record(direction)                              # track all moves
+        self.record_move(direction)                              # track all moves
         return direction
 
+    def print_comparison_tests(self, game):
+        print 'Comparisons...'
+        print 'Minecounts:'
+        print '1', compare.get_mine_count(1, game)
+        print '2', compare.get_mine_count(2, game)
+        print '3', compare.get_mine_count(3, game)
+        print '4', compare.get_mine_count(4, game)
+        
+        # for hero_loc in game.heroes_locs:
+            # print hero_loc, compare.get_hero_value(hero_loc, game)
+        
+        if STAY in self.moves: print 'STAY\'s:', self.moves[STAY]
+
+        print 'Projected final order:', compare.project_end_state(game)
+        
+        print 'Top 5 Targets by Value:' 
+        for loc in compare.highest_value_locs(game)[:5]:
+            if loc in game.mines_locs:
+                print 'Mine', loc
+            if loc in game.heroes_locs:
+                print 'Hero', loc
+        
+        return
+    
     # returns goal based on game state
     def determine_goal (self, game):
         goal = None
 
         goal = EXPAND                                       # default
+        
+        if (compare.projected_winner(game) == self.identity):
+            goal = DEFEND
 
         if (self.life < LIFE_THRESHOLD and self.can_buy()): # healing override
             goal = HEAL
@@ -192,13 +217,13 @@ class RamBot(Bot):
             destination = self.choose_best(nearest_mines)
         
         elif goal == DEFEND:
-            destination = None
+            destination = self.pos
 
         elif goal == HEAL:
             destination = self.find_nearest_obj('tavern', game)[0]
 
         elif goal == FIGHT:
-            destination = None
+            destination = self.pos
 
         else:
             destination = None
@@ -300,9 +325,8 @@ class RamBot(Bot):
         self.knowledge['GAME'] = game
         self.knowledge['LEADER'] = game.get_leader_id()
 
-    def record(self, dir):
+    def record_move(self, dir):
         self.moves[dir] += 1
-
 
     def just_died(self):
         died = False
@@ -319,14 +343,14 @@ class RamBot(Bot):
         return 'Turn: ' + str(self.turn) + '  pos: ' + str(self.pos) + \
             '  $: ' + str(self.gold) + '  Life: ' + str(self.life) + \
             '  Mines: ' + str(self.mineCount) + \
-            '  Dest: ' + str(self.get_current_waypoint()) + \
+            '  Mode: ' + self.goal + \
             '  Deaths: ' + str(self.deaths) + \
             '\nHistory: ' + str(history) + \
             '\nWpts: ' + str(self.waypoints)
 
             # + '  ID: ' + str(self.identity)
             # + '  Crashed: ' + str(self.crashed)
-
+            # + '  Dest: ' + str(self.get_current_waypoint()) + \
 
     def choose_best(self, locs):
         best = None
