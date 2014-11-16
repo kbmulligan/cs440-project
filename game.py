@@ -80,7 +80,16 @@ class Game:
                 maxId = hero.id
                 maxGold = hero.gold
                 
-        return maxId   
+        return maxId
+        
+    def get_hero_by_id(self, hero_id):
+        wanted = None
+        for hero in self.heroes:
+            if hero_id == hero.id:
+                wanted = hero
+                break
+        return wanted
+        
 
 class Board:
     def __parseTile(self, string):

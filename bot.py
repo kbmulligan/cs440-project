@@ -48,6 +48,9 @@ STEPS_TO_DISPLAY = 7
 LIFE_THRESHOLD = 70
 FULL_LIFE = 100
 
+COMFORTABLE_LEAD = 200          # how much more gold you want than the next closest bot before going defensive
+DESIRED_LEAD_MARGIN = 0.25      # (percent of current gold) how much of a lead you want before going defensive
+
 BEER_COST = 2
 
 MINES_TO_COMPARE = 3
@@ -183,10 +186,14 @@ class RamBot(Bot):
         
         if STAY in self.moves: print 'STAY\'s:', self.moves[STAY]
 
-        print 'Projected final order:', compare.project_end_state(game)
+        order = compare.project_end_state(game)
+        print 'Projected final order:', order
+        
+        print 'Hero', order[0], 'will win by:', compare.project_gold_diff(order[0], order[1], game), 'gold'
         
         print 'Top 5 Targets by Value:' 
-        for loc in compare.highest_value_locs(game)[:5]:
+        locs = game.others_mines_locs.keys() + game.other_heroes_locs.keys()
+        for loc in compare.sort_by_highest_value(locs, game)[:5]:
             if loc in game.mines_locs:
                 print 'Mine', loc
             if loc in game.heroes_locs:
@@ -200,7 +207,11 @@ class RamBot(Bot):
 
         goal = EXPAND                                       # default
         
-        if (compare.projected_winner(game) == self.identity):
+        order = compare.project_end_state(game)
+        if (compare.projected_winner(game) == self.identity and \
+                compare.project_gold_diff(order[0], order[1], game) > \
+                compare.project_end_gold(game.get_hero_by_id(self.identity), game) \
+                * DESIRED_LEAD_MARGIN):
             goal = DEFEND
 
         if (self.life < LIFE_THRESHOLD and self.can_buy()): # healing override

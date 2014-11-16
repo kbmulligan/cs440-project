@@ -13,14 +13,11 @@ import priorityqueue as pq
 
 BOTS = 4
 
-def highest_value_locs(game):
+def sort_by_highest_value(locs, game):
     q = pq.PriorityQueue()
     
-    for mloc in game.others_mines_locs:
-        q.insert(mloc, -gold_value(mloc, game))
-    
-    for hloc in game.other_heroes_locs:
-        q.insert(hloc, -gold_value(hloc, game))
+    for loc in locs:
+        q.insert(loc, -gold_value(loc, game))
     
     locs = []
     while not q.is_empty():
@@ -66,14 +63,19 @@ def project_end_state(game):
     order = pq.PriorityQueue()
     
     for hero in game.heroes:
-        riches = hero.gold + hero.mineCount * turns_left(game)
+        riches = project_end_gold(hero, game)
         order.insert(hero.id, -riches)
-    
     final = []
     while not order.is_empty():
         final.append(order.remove())
-    
     return final
     
 def projected_winner(game):
     return project_end_state(game)[0]
+    
+def project_end_gold(hero, game):
+    return hero.gold + hero.mineCount * turns_left(game)
+    
+# returns the difference in projected gold between hero1 and hero2, positive if hero1 will have more gold
+def project_gold_diff(hero1_id, hero2_id, game):
+    return project_end_gold(game.get_hero_by_id(hero1_id), game) - project_end_gold(game.get_hero_by_id(hero2_id), game)
