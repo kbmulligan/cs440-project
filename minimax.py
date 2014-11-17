@@ -82,13 +82,13 @@ class Vindinium(MiniMaxGame):
         for minePos, ownerId in game.state['game']['board']['mines'].iteritems():
             if ownerId != str(playerId + 1):
                 availActions.append((ATTACK_TROLL_ACTION, minePos, ownerId))
-            
+        """    
         #do the same for adversaries
 #         for opPos, opId in game.other_heroes_locs.iteritems():
         for hero in game.state['game']['heroes']:
             if hero['id'] != (playerId + 1):
                 availActions.append((ATTACK_PLAYER_ACTION, (hero['pos']['y'], hero['pos']['x']), hero['id']))
-            
+        """    
         """#actions for health
         for barPos in game.taverns_locs:
             availActions.append((HEAL_ACTION, barPos))
@@ -110,6 +110,10 @@ class Vindinium(MiniMaxGame):
         globalTurn = state['game']['turn']
         playerId = (globalTurn % 4) 
         playerName = state['game']['heroes'][playerId ]['name']
+        
+        #save this palyer's name for utility calc
+        state['game']['lastPlayer'] = playerName
+        state['game']['lastPlayerZeroId'] = playerId
         
         #parse state
         game = Game(state, playerName, False)
@@ -293,7 +297,7 @@ class Vindinium(MiniMaxGame):
             
         return retVal
     
-    def utility(self, state, player):
+    def utility(self, state):
         "Return the value of this final state to player."
         #value is going to be the amount of utility
         
@@ -304,17 +308,20 @@ class Vindinium(MiniMaxGame):
 #         else:
 
         playerId = -1
+        
+        #get player name based off of 
+        playerName = state['game']['lastPlayer']
             
         othersGoldCount = []
         for hero in state['game']['heroes']:
-            if hero['name'] != player:
+            if hero['name'] != playerName:
                 othersGoldCount.append(hero['gold'])
                 #add amount of life to utility
             else:
                 #get this player's id
                 playerId = int(hero['id'])
                 
-        oppenentMaxMine = sum(othersGoldCount)
+        oppenentsGoldSum = sum(othersGoldCount)
        
         numMovesToGetHere = state['game']['heroes'][playerId -1 ]['numMoves']
         
@@ -323,7 +330,7 @@ class Vindinium(MiniMaxGame):
         if numMovesToGetHere != 0:
             reduceMoves = log(int(numMovesToGetHere))
         
-        utility = (state['game']['heroes'][playerId -1]['gold'] - oppenentMaxMine) - reduceMoves
+        utility = (state['game']['heroes'][playerId -1]['gold'] - oppenentsGoldSum) - reduceMoves
 #         utility = utility * -1
         return utility
     
@@ -385,10 +392,23 @@ def alphabeta_search(miniMaxGame, d=4, cutoff_test=None, eval_fn=None):
             beta = min(beta, v)
         return v
     
+    def getZeroBasedPlayerIdForThisTurn(state):
+        
+        globalTurn = state['game']['turn']
+        playerId = (globalTurn % 4) 
+        
+        return playerId
+    
+    def getOurPlayerId(state):
+        
+        return int(state['hero']['id'])
+        
+    
     def argMaxMinVal(action):
         newState = miniMaxGame.result(initialState, action)
 #         print "action : " + str(action) + "'s result:"
 #         print pretty_map(Game(newState, miniMaxGame.myHeroName))
+#         minVal = max_value(newState, -infinity, infinity, 0)
         minVal = min_value(newState, -infinity, infinity, 0)
         
         return minVal
@@ -397,7 +417,7 @@ def alphabeta_search(miniMaxGame, d=4, cutoff_test=None, eval_fn=None):
     # The default test cuts off at depth d or at a terminal state
     cutoff_test = (cutoff_test or
                    (lambda state,depth: depth>d or miniMaxGame.terminal_test(state)))
-    eval_fn = eval_fn or (lambda state: miniMaxGame.utility(state, player))
+    eval_fn = eval_fn or (lambda state: miniMaxGame.utility(state))
     
     actionList = miniMaxGame.actions(miniMaxGame.initial, True)
     print "actionList: " + str(actionList)

@@ -11,7 +11,7 @@ class Test(unittest.TestCase):
 
 
     def testGetClosestMineAtBeginning(self):
-#         """
+        """
         initial = {u'viewUrl': u'http://vindinium.org/cl7m3tme', 
                    u'game': 
                         {u'turn': 0, 
@@ -31,8 +31,8 @@ class Test(unittest.TestCase):
                          u'token': u'66fv', 
                          u'playUrl': u'http://vindinium.org/api/cl7m3tme/66fv/play'
                         }
-#         """
         """
+#         """
         initial = {u'viewUrl': u'http://vindinium.org/cl7m3tme', 
                    u'game': 
                         {u'turn': 0, 
@@ -52,7 +52,7 @@ class Test(unittest.TestCase):
                          u'token': u'66fv', 
                          u'playUrl': u'http://vindinium.org/api/cl7m3tme/66fv/play'
                         }
-        """
+#         """
         myHeroName = initial['hero']['name']
         v1 = Vindinium(myHeroName, initial)
         
