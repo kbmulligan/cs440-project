@@ -53,7 +53,7 @@ DESIRED_LEAD_MARGIN = 0.25      # (percent of current gold) how much of a lead y
 
 BEER_COST = 2
 
-MINES_TO_COMPARE = 3
+MINES_TO_COMPARE = 10
 
 
 # for A*
@@ -128,7 +128,7 @@ class RamBot(Bot):
 
         print self.summary()
 
-        # self.eval_nearby(game)
+        self.eval_nearby(game)
 
         direction = None
         
@@ -196,9 +196,10 @@ class RamBot(Bot):
         for loc in compare.sort_by_highest_value(locs, game)[:5]:
             if loc in game.mines_locs:
                 print 'Mine', loc
-            if loc in game.heroes_locs:
+            elif loc in game.heroes_locs:
                 print 'Hero', loc
-        
+            else:
+                print 'Neither?', loc
         return
     
     # returns goal based on game state
@@ -242,10 +243,10 @@ class RamBot(Bot):
         return destination
 
     def eval_nearby(self, game):
-        mine = self.choose_best(self.find_nearest_unowned_mines(game, MINES_TO_COMPARE))
-        if (self.life - self.pf.path_cost(self.pf.get_path(self.pos, mine, game.board, self.path_heuristic))*2 > 85 and \
-            mine not in self.waypoints):
-            self.insert_immediate_waypoint(mine)
+        # mine = self.choose_best(self.find_nearest_unowned_mines(game, MINES_TO_COMPARE))
+        # if (self.life - self.pf.path_cost(self.pf.get_path(self.pos, mine, game.board, self.path_heuristic))*2 > 85 and \
+            # mine not in self.waypoints):
+            # self.insert_immediate_waypoint(mine)
         
         near_tavern = self.find_nearest_obj('tavern', game)[0]  
         if (self.life + self.pf.path_cost(self.pf.get_path(self.pos, near_tavern, game.board, self.path_heuristic)) < LIFE_THRESHOLD and \
@@ -379,11 +380,12 @@ class RamBot(Bot):
 
     def score_loc(self, loc):
         score = 0
-        score += -len(self.pf.get_path(self.pos, loc, self.knowledge['GAME'].board, self.path_heuristic))
         
-        if (self.get_owner_id(loc, self.knowledge['GAME']) in HERO_IDs):
-            score += 5
-
+        gold_value = compare.gold_value(loc, self.knowledge['GAME'])
+        path_length = len(self.pf.get_path(self.pos, loc, self.knowledge['GAME'].board, self.path_heuristic))
+        score += float(gold_value) / path_length
+        
+        print 'Score', loc, ' val:', gold_value, 'path len:', path_length, '  Score:', score
         return score
 
 
