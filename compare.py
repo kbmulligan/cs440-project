@@ -13,6 +13,18 @@ import priorityqueue as pq
 
 BOTS = 4
 
+# returns the avg of a list of coords
+def center_mass(locs):
+    x = 0
+    y = 0
+    for loc in locs:
+        x += loc[0]
+        y += loc[1]
+    return (x/len(locs), y/len(locs))
+
+
+
+
 def sort_by_highest_value(locs, game):
     q = pq.PriorityQueue()
     

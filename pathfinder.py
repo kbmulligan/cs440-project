@@ -13,7 +13,7 @@ from priorityqueue import PriorityQueue
 
 VERBOSE_ASTAR = False
 
-PATHFINDER_TIMEOUT = 0.8
+PATHFINDER_TIMEOUT = 0.25
 
 PLAYERS = 4
 HERO_IDs = ['1', '2', '3', '4']
@@ -121,8 +121,7 @@ class Pathfinder():
                 i = previous[i]
             else:
                 print 'get_path error: probably could not find a valid path from', start, 'to', end
-                path = [start, start]           # return something valid
-                break
+                return [start, start]    # return something valid
 
         path.reverse()
 
@@ -131,40 +130,6 @@ class Pathfinder():
     # returns the length of the path in moves
     def path_cost(self, path):
         return len(path) - 1
-
-    # cost estimate for A*, Manhattan distance heuristic
-    def path_heuristic(self, n, end):
-        return get_distance(n, end) + self.penalties(n)
-
-    # returns heuristic adjustments for walking over things like spawn points or bots with high relative life
-    def penalties(self, pos):
-        total = 0
-
-        board = self.knowledge['GAME'].board
-        enemy_locs = [x for x in self.knowledge['GAME'].heroes_locs if x != self.pos]
-        enemy_spawns = self.knowledge['ENEMY SPAWNS']
-
-        if pos in enemy_spawns:
-            total += MOVE_PENALTY['SPAWN POINT']
-
-        if pos in enemy_locs:
-            total += MOVE_PENALTY['ENEMY']
-
-        adj_hero = []
-        for loc in enemy_locs:
-            for here in get_neighboring_locs(loc, board):
-                adj_hero.append(here)
-
-        if pos in adj_hero:
-            total += MOVE_PENALTY['ADJ ENEMY']
-
-        if self.loc_history[-20:].count(pos) > 5:
-            total += MOVE_PENALTY['PROHIBITED']
-
-        unpassable = [x for x in get_neighboring_locs(pos, board) if not board.passable(x)]
-        total += len(unpassable)
-
-        return total
 
     
 
