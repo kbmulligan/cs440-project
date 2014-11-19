@@ -17,13 +17,14 @@ BOTS = 4
 def center_mass(locs):
     x = 0
     y = 0
-    for loc in locs:
-        x += loc[0]
-        y += loc[1]
-    return (x/len(locs), y/len(locs))
-
-
-
+    if locs:
+        for loc in locs:
+            x += loc[0]
+            y += loc[1]
+        center = (x/len(locs), y/len(locs))
+    else:
+        center = ()
+    return center
 
 def sort_by_highest_value(locs, game):
     q = pq.PriorityQueue()

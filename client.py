@@ -9,7 +9,7 @@ import time
 from bot import RandomBot, SlowBot, RamBot, ManualBot
 
 TIMEOUT=15
-MAP = 'm5'
+MAP = 'm6'
 
 vfName = 'viewgames.html'
 

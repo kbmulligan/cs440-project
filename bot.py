@@ -435,9 +435,15 @@ class RamBot(Bot):
         gold_value = compare.gold_value(loc, self.knowledge['GAME'])
         path_length = len(self.pf.get_path(self.pos, loc, self.knowledge['GAME'].board, self.path_heuristic))
         
+        hub = compare.center_mass(self.get_owned_mines(self.knowledge['GAME']))               # the middle of all owned mines
+        if hub:
+            dhub = get_distance(hub, loc)
+        else:
+            dhub = 0
         # total score accounts for time taken to capture and normalizes for that same cost
         # this essential leaves you with future value per move spent, optimizing the use of each move
         score += (float(gold_value) - path_length) / path_length
+        score -= dhub 
         
         print 'Score', loc, ' val:', gold_value, 'path len:', path_length, '  Score:', score
         return score
@@ -472,7 +478,7 @@ class RamBot(Bot):
 
         return unowned_mines
         
-    def find_owned_mines(self, game):
+    def get_owned_mines(self, game):
         mines = self.find_nearest_obj('mine', game)
         owned = self.get_owned_by_id(mines, self.identity, game)
         return owned
