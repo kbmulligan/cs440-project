@@ -53,7 +53,7 @@ FULL_LIFE = 100
 COMFORTABLE_LEAD = 200          # how much more gold you want than the next closest bot before going defensive
 DESIRED_LEAD_MARGIN = 1.0       # (percent of current gold) how much of a lead you want before going defensive
 MIN_LEAD_MARGIN = 0.9
-NEVER_FUCKING_STOP = 100000
+NEVER_STOP = 100000
 
 
 BEER_COST = 2
@@ -252,7 +252,7 @@ class RamBot(Bot):
         if (compare.projected_winner(game) == self.identity and \
                 compare.project_gold_diff(order[0], order[1], game) > \
                 compare.project_end_gold(game.get_hero_by_id(self.identity), game) \
-                * desired_lead_margin + NEVER_FUCKING_STOP):
+                * desired_lead_margin + NEVER_STOP):
             goal = DEFEND
 
         life_threshold = (LIFE_THRESHOLD - MIN_LIFE) / (order.index(self.identity) + 1) + MIN_LIFE
@@ -568,20 +568,7 @@ class RamBot(Bot):
 
         if pos in enemy_spawns:
             total += MOVE_PENALTY['SPAWN POINT']
-
-        # if pos in enemy_locs:
-            # total += MOVE_PENALTY['ENEMY']
-
-        # adj_enemy = []
-        # for loc in enemy_locs:
-            # for here in pathfinder.get_neighboring_locs(loc, board):
-                # adj_enemy.append(here)
-        # if pos in adj_enemy:
-            # total += MOVE_PENALTY['ADJ ENEMY']
-
-        # if self.loc_history[-20:].count(pos) > 10:
-            # total += MOVE_PENALTY['PROHIBITED']
-
+            
         return total
 
         
