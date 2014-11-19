@@ -185,6 +185,7 @@ def leftClick(pos):
 def rightClick(pos):
     global msg
     msg = 'right click'
+    previous_turn()
 
 def middleClick(pos):
     global msg
@@ -227,6 +228,11 @@ def next_turn():
     global turn
     turn += 1
     turn = min(turn, turns-1)
+    
+def previous_turn():
+    global turn
+    turn -= 1
+    turn = max(turn, 0)
     
 # graphics    
 def draw(board):
