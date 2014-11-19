@@ -18,7 +18,7 @@ import compare
 
 BOT_NAME = 'nitorbot'
 
-VERBOSE_ASTAR = False
+VERBOSE_ASTAR = True
 SHOW_CUSTOM_MAP = True
 SHOW_MAP_EVERY_X_TURNS = 1
 
@@ -53,10 +53,13 @@ FULL_LIFE = 100
 COMFORTABLE_LEAD = 200          # how much more gold you want than the next closest bot before going defensive
 DESIRED_LEAD_MARGIN = 1.0       # (percent of current gold) how much of a lead you want before going defensive
 MIN_LEAD_MARGIN = 0.9
+NEVER_FUCKING_STOP = 100000
+
 
 BEER_COST = 2
 
 MIN_MINES_TO_COMPARE = 4
+
 
 
 # for A*
@@ -65,6 +68,7 @@ MOVE_PENALTY = {'SPAWN POINT': 3,
                 'ENEMY': 5, 
                 'ADJ ENEMY':3,
                 'PROHIBITED': 100}
+MAX_SEARCHES = 5
 
 # for custom map printout
 AIR_TILE = '  '
@@ -154,17 +158,21 @@ class RamBot(Bot):
         self.mode = TRAVEL
         
         # Make progress toward destination
-        path = self.pf.get_path(self.pos, self.get_current_waypoint(), game.board, self.path_heuristic)
+        if any(self.waypoints):
+            path = self.pf.get_path(self.pos, self.get_current_waypoint(), game.board, self.path_heuristic)
+        else:
+            print 'No waypoints!!!'
+            path = [self.pos, self.pos]
         
         # if no valid path found, remove waypoint, add randomness, try again
         searches = 1
         while (path == [self.pos, self.pos]):
             self.remove_current_waypoint()
-            if self.waypoints == []:
+            if not self.waypoints:
                 self.add_waypoint(self.determine_dest(self.goal, game, True))
             path = self.pf.get_path(self.pos, self.get_current_waypoint(), game.board, self.path_heuristic)
             searches += 1
-            if searches > 5:
+            if searches > MAX_SEARCHES:
                 path = [self.pos, self.pos]
                 break
             
@@ -244,7 +252,7 @@ class RamBot(Bot):
         if (compare.projected_winner(game) == self.identity and \
                 compare.project_gold_diff(order[0], order[1], game) > \
                 compare.project_end_gold(game.get_hero_by_id(self.identity), game) \
-                * desired_lead_margin):
+                * desired_lead_margin + NEVER_FUCKING_STOP):
             goal = DEFEND
 
         life_threshold = (LIFE_THRESHOLD - MIN_LIFE) / (order.index(self.identity) + 1) + MIN_LIFE
@@ -255,29 +263,32 @@ class RamBot(Bot):
 
     # return destination based on goal
     def determine_dest (self, goal, game, randomness=False):
-        destination = ()
+        destination = None
 
         if goal == EXPAND:
             nearest_mines = self.find_nearest_unowned_mines(game, mines_to_compare(game))
-            if (randomness):
+            print 'near mines', nearest_mines
+            if not nearest_mines:
+                self.goal = DEFEND
+                goal = DEFEND
+                destination = self.pos
+            elif randomness:
                 destination = random.choice(nearest_mines)
             else:
                 destination = self.choose_best(nearest_mines)
         
-        elif goal == DEFEND:
+        if goal == DEFEND:
             destination = self.pos
 
-        elif goal == HEAL:
-            if (randomness):
+        if goal == HEAL:
+            if randomness:
                 destination = random.choice(self.find_nearest_obj('tavern', game))
             else:
                 destination = self.find_nearest_obj('tavern', game)[0]
             
-        elif goal == FIGHT:
+        if goal == FIGHT:
             destination = self.pos
 
-        else:
-            destination = None
 
         return destination
 
@@ -408,10 +419,11 @@ class RamBot(Bot):
         q = PriorityQueue()
 
         print 'choose best, locs:', locs
-
-        for loc in locs:
-            q.insert(loc, -self.score_loc(loc))     # by highest score
-        best = q.remove()
+        
+        if locs != None:
+            for loc in locs:
+                q.insert(loc, -self.score_loc(loc))     # by highest score
+            best = q.remove()
 
         print 'choose best, best:', best
 
@@ -560,12 +572,11 @@ class RamBot(Bot):
         # if pos in enemy_locs:
             # total += MOVE_PENALTY['ENEMY']
 
-        # adj_hero = []
+        # adj_enemy = []
         # for loc in enemy_locs:
             # for here in pathfinder.get_neighboring_locs(loc, board):
-                # adj_hero.append(here)
-
-        # if pos in adj_hero:
+                # adj_enemy.append(here)
+        # if pos in adj_enemy:
             # total += MOVE_PENALTY['ADJ ENEMY']
 
         # if self.loc_history[-20:].count(pos) > 10:
