@@ -1,5 +1,7 @@
-# vinvis.py - custom Vindinium game viewer implemented with and dependent upon pygame library
-# Author: nitor
+# vinvis.py - custom Vindinium game viewer
+# -optional
+# -requires pygame
+# Author: KBM
 # Date: Nov 2014
 #
 # WTFPL
