@@ -91,6 +91,7 @@ class RamBot(Bot):
 
     loc_history = []         # list of past coordinates in chronological order, i.e. [0] => start, [-1] => last turn
     deaths = 0
+    hub = 0
 
     knowledge = {}          # A dict with misc info in it. 
                             # Keys used so far: 
@@ -237,6 +238,7 @@ class RamBot(Bot):
                 # print 'Hero', loc
             # else:
                 # print 'Neither?', loc
+        
         return
     
     # returns goal based on game state
@@ -387,6 +389,7 @@ class RamBot(Bot):
         self.knowledge['GAME'] = game
         self.knowledge['LEADER'] = game.get_leader_id()
 
+
     def record_move(self, dir):
         self.moves[dir] += 1
 
@@ -435,9 +438,9 @@ class RamBot(Bot):
         gold_value = compare.gold_value(loc, self.knowledge['GAME'])
         path_length = len(self.pf.get_path(self.pos, loc, self.knowledge['GAME'].board, self.path_heuristic))
         
-        hub = compare.center_mass(self.get_owned_mines(self.knowledge['GAME']))               # the middle of all owned mines
-        if hub:
-            dhub = get_distance(hub, loc)
+        # self.hub = compare.center_mass(ctrl_points)               # the middle of all owned mines
+        if self.hub:
+            dhub = get_distance(self.hub, loc)
         else:
             dhub = 0
         # total score accounts for time taken to capture and normalizes for that same cost
@@ -548,15 +551,20 @@ class RamBot(Bot):
         return locs
 
     def determine_spawns(self, game):
-
+        x = 0
+        y = 0
         for hero in game.heroes:
             if hero.name == self.name:
                 self.spawn = hero.spawn
+                x = int(hero.spawn['x'])
+                y = int(hero.spawn['y'])
+                break
 
         spawns = [hero.spawn for hero in game.heroes]
-        spawns = [x for x in spawns if x != self.spawn]
+        spawns = [s for s in spawns if s != self.spawn]
         self.knowledge['ENEMY SPAWNS'] = spawns
-
+        
+        self.spawn = (x,y)            # final assignment should be usable numbers
         return None
     
 

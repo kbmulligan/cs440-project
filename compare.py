@@ -92,3 +92,6 @@ def project_end_gold(hero, game):
 # returns the difference in projected gold between hero1 and hero2, positive if hero1 will have more gold
 def project_gold_diff(hero1_id, hero2_id, game):
     return project_end_gold(game.get_hero_by_id(hero1_id), game) - project_end_gold(game.get_hero_by_id(hero2_id), game)
+    
+def open_sides(mine, game):
+    return game.board.passables(pathfinder.find_neighboring_locs(mine))
