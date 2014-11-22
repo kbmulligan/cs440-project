@@ -9,16 +9,16 @@ import time
 from bot import RandomBot, SlowBot, RamBot, ManualBot
 
 TIMEOUT=15
-MAP = 'm6'
+MAP = 'm5'
 
 vfName = 'viewgames.html'
 
-def get_new_game_state(session, server_url, key, mode='training', number_of_turns = 10):
+def get_new_game_state(session, server_url, key, mode='training', number_of_turns = 10, mapx=MAP):
     """Get a JSON from the server containing the current state of the game"""
 
     if(mode=='training'):
         #Don't pass the 'map' parameter if you want a random map
-        params = { 'key': key, 'turns': number_of_turns, 'map': MAP}
+        params = { 'key': key, 'turns': number_of_turns, 'map': mapx}
         api_endpoint = '/api/training'
     elif(mode=='arena'):
         params = { 'key': key}
@@ -56,7 +56,7 @@ def move(session, url, direction):
 def is_finished(state):
     return state['game']['finished']
 
-def start(server_url, key, mode, turns, bot):
+def start(server_url, key, mode, turns, bot, use_map=MAP):
     """Starts a game with all the required parameters"""
 
     # Create a requests session that will be used throughout the game
@@ -65,7 +65,7 @@ def start(server_url, key, mode, turns, bot):
     if(mode=='arena'):
         print(u'Connected and waiting for other players to join...')
     # Get the initial state
-    state = get_new_game_state(session, server_url, key, mode, turns)
+    state = get_new_game_state(session, server_url, key, mode, turns, use_map)
     print("Playing at: " + state['viewUrl'])
     viewURL = state['viewUrl']
 
@@ -134,9 +134,12 @@ if __name__ == "__main__":
             server_url = sys.argv[5]
         else:
             server_url = "http://vindinium.org"
+            
+        if (len(sys.argv) == 7):
+            use_map = sys.argv[6]
 
         for i in range(number_of_games):
-            viewURL = start(server_url, key, mode, number_of_turns, RamBot(botName))
+            viewURL = start(server_url, key, mode, number_of_turns, RamBot(botName), use_map=MAP)
             print("\nGame finished: %d/%d" % (i+1, number_of_games))
             
         

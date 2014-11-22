@@ -55,11 +55,9 @@ DESIRED_LEAD_MARGIN = 1.0       # (percent of current gold) how much of a lead y
 MIN_LEAD_MARGIN = 0.9
 NEVER_STOP = 100000
 
-
 BEER_COST = 2
-
 MIN_MINES_TO_COMPARE = 4
-
+MAX_MINES_TO_COMPARE = 10
 
 
 # for A*
@@ -107,9 +105,7 @@ class RamBot(Bot):
 
     # waypoints is list of coords of planned destinations, waypoints[0] is next immediate destination
     waypoints = []
-    
-    
-    
+
     def __init__(self, name=BOT_NAME):
         self.spawn = None
         self.name = name
@@ -120,64 +116,54 @@ class RamBot(Bot):
         self.moves[EAST] = 0
         self.moves[WEST] = 0
     
-    
     # called each turn, updates hero state, returns direction of movement hero bot chooses to go
     def move(self, state):
+        """Determine which way the bot should move given game state."""
+        
+        ##### ADMIN AND GAME MANAGEMENT #############################
         t0 = time.time()
-
         game = Game(state, self.name)
+        
+        if self.turn < 2:
+            self.game_setup(game)
+        
         self.update(game)
-
-        if self.turn <= 1:
-            self.determine_spawns(game)
-            
-        if state['game']['turn'] < 4:
-            f = open(game_output, 'w')
-            if f == None:
-                print 'error opening output file', game_output
-            else:
-                f.truncate(0)
-            f.close()
 
         # print game info
         if (self.turn % SHOW_MAP_EVERY_X_TURNS == 0):
             print ''
             print pretty_map(game, SHOW_CUSTOM_MAP)
-            
+
         write_gamestate(state)
-
         print self.summary()
-
-        self.eval_nearby(game)
-
-        direction = None
+        ##### ADMIN COMPLETE - START WORKING ACTUAL MOVEMENT ########
         
+        direction = None
         if self.get_current_waypoint() == None:
             self.goal = self.determine_goal(game)
             self.add_waypoint(self.determine_dest(self.goal, game))
-            
-        self.mode = TRAVEL
-        
+
         # Make progress toward destination
         if any(self.waypoints):
-            path = self.pf.get_path(self.pos, self.get_current_waypoint(), game.board, self.path_heuristic)
+            wpt = self.get_current_waypoint()
+            path = self.pf.get_path(self.pos, wpt, game.board, self.path_heuristic)
         else:
             print 'No waypoints!!!'
             path = [self.pos, self.pos]
         
-        # if no valid path found, remove waypoint, add randomness, try again
+        # if no valid path found, remove waypoint, add randomness, and try again
         searches = 1
         while (path == [self.pos, self.pos]):
             self.remove_current_waypoint()
             if not self.waypoints:
-                self.add_waypoint(self.determine_dest(self.goal, game, True))
-            path = self.pf.get_path(self.pos, self.get_current_waypoint(), game.board, self.path_heuristic)
+                self.add_waypoint(self.determine_dest(self.goal, game, randomness=True))
+            next_wpt = self.get_current_waypoint()
+            path = self.pf.get_path(self.pos, next_wpt, game.board, self.path_heuristic)
             searches += 1
             if searches > MAX_SEARCHES:
                 path = [self.pos, self.pos]
                 break
-            
-            
+
         print 'Current path:', path
         print 'Distance:', len(path) - 1
         
@@ -187,28 +173,27 @@ class RamBot(Bot):
             next_pos = self.pos
         print 'Next move:', next_pos
 
-        direction = self.get_dir_to(next_pos)
+        direction = self.pf.get_dir_to(self.pos, next_pos)
         print 'Direction:', direction
 
+        # test if bot has arrived at waypoint
         if game.board.to(self.pos, direction) == self.get_current_waypoint():
             self.remove_current_waypoint()
-            
 
+
+        ##### MORE INFORMATION AND TIME/GAME MANAGEMENT #############
         print ''
         self.print_comparison_tests(game)
 
         # Safety check -- I think bad dirs can cause HTTP 400 Errors - kbm
-        if direction == None:
-            print 'Direction was None!!!'
-            direction = STAY
-
+        direction = safety_check(direction)
+        self.record_move(direction)                         # track all moves
+        
         td = time.time() - t0                               # Time check
         if (td > TIME_THRESHOLD):
             print "Close on time!!!", td
-
         print 'Response time: %.3f' % td
-
-        self.record_move(direction)                              # track all moves
+        
         return direction
 
     def print_comparison_tests(self, game):
@@ -238,6 +223,8 @@ class RamBot(Bot):
                 # print 'Hero', loc
             # else:
                 # print 'Neither?', loc
+                
+        print 'self.pos accessible sides =', compare.accessible_sides(self.pos, game)
         
         return
     
@@ -294,19 +281,6 @@ class RamBot(Bot):
 
         return destination
 
-    def eval_nearby(self, game):
-        # mine = self.choose_best(self.find_nearest_unowned_mines(game, MINES_TO_COMPARE))
-        # if (self.life - self.pf.path_cost(self.pf.get_path(self.pos, mine, game.board, self.path_heuristic))*2 > 85 and \
-            # mine not in self.waypoints):
-            # self.insert_immediate_waypoint(mine)
-        
-        near_tavern = self.find_nearest_obj('tavern', game)[0]  
-        if (self.life + self.pf.path_cost(self.pf.get_path(self.pos, near_tavern, game.board, self.path_heuristic)) < LIFE_THRESHOLD and \
-            near_tavern not in self.waypoints and self.can_buy()):
-            self.insert_immediate_waypoint(near_tavern)
-            if (self.life - self.pf.path_cost(self.pf.get_path(self.pos, near_tavern, game.board, self.path_heuristic)) < FULL_LIFE / 2):
-                self.insert_immediate_waypoint(near_tavern)
-
     def get_current_waypoint(self):
         wpt = None
         if any(self.waypoints):
@@ -328,31 +302,6 @@ class RamBot(Bot):
     def insert_immediate_waypoint(self, wpt):
         self.waypoints.insert(0, wpt)
 
-    
-
-    # returns direction to go based on destination coords 'dest'
-    def get_dir_to(self, dest):
-        drow = dest[0] - self.pos[0]
-        dcol = dest[1] - self.pos[1]
-
-        # if N/S is greater than E/W difference, the make the N/S change first
-        if (abs(drow) > abs(dcol)):               
-            if (drow > 0):
-                d = SOUTH
-            elif (drow < 0):
-                d = NORTH
-            else:
-                d = STAY
-        else:
-            if (dcol > 0):
-                d = EAST
-            elif (dcol < 0):
-                d = WEST
-            else:
-                d = STAY
-
-        return d
-
     def set_goal(self, newGoal):
         self.goal = newGoal
 
@@ -367,7 +316,7 @@ class RamBot(Bot):
         
     # update self state vars
     def update(self, game):
-        self.turn = game.state['game']['turn'] / PLAYERS
+        self.turn = game.state['game']['turn'] / PLAYERS + 1
         
         for hero in game.heroes:
             if hero.name == self.name:
@@ -389,6 +338,10 @@ class RamBot(Bot):
         self.knowledge['GAME'] = game
         self.knowledge['LEADER'] = game.get_leader_id()
 
+        mines = self.find_nearest_obj('mine', game)
+        control_pts = self.get_owned_by_id(mines, self.identity, game)
+        control_pts.append(self.spawn)
+        self.hub = compare.center_mass(control_pts)
 
     def record_move(self, dir):
         self.moves[dir] += 1
@@ -434,21 +387,23 @@ class RamBot(Bot):
 
     def score_loc(self, loc):
         score = 0
+        board = self.knowledge['GAME'].board
         
         gold_value = compare.gold_value(loc, self.knowledge['GAME'])
-        path_length = len(self.pf.get_path(self.pos, loc, self.knowledge['GAME'].board, self.path_heuristic))
+        path_length = len(self.pf.get_path(self.pos, loc, board, self.path_heuristic)) - 1
         
-        # self.hub = compare.center_mass(ctrl_points)               # the middle of all owned mines
+        # self.hub is the middle of all owned mines and spawn point
         if self.hub:
             dhub = get_distance(self.hub, loc)
         else:
             dhub = 0
+            
         # total score accounts for time taken to capture and normalizes for that same cost
         # this essential leaves you with future value per move spent, optimizing the use of each move
         score += (float(gold_value) - path_length) / path_length
         score -= dhub 
         
-        print 'Score', loc, ' val:', gold_value, 'path len:', path_length, '  Score:', score
+        print 'Score', loc, ' val:', gold_value, 'path len:', path_length, 'dCenter:', dhub, '  Score:', score
         return score
 
 
@@ -584,6 +539,10 @@ class RamBot(Bot):
             total += MOVE_PENALTY['SPAWN POINT']
             
         return total
+        
+    def game_setup(self, game):
+        erase_file()
+        self.determine_spawns(game)
 
         
         
@@ -623,7 +582,7 @@ class ManualBot(Bot):                                        # Could not resist
 ########## UTILITY FUNCTIONS ##########
 
 def mines_to_compare(game):
-    return max([int(math.ceil(len(game.mines_locs) * 0.4)), MIN_MINES_TO_COMPARE])
+    return min([max([int(math.ceil(len(game.mines_locs) * 0.4)), MIN_MINES_TO_COMPARE])], MAX_MINES_TO_COMPARE)
 
 # returns a board line with characters replaced into something readable
 def convert_line(line):
@@ -671,7 +630,8 @@ def pretty_map(game, customView=False):
                 output += game.state['game']['board']['tiles'][begin:end] + '\n'
             
         return output
-        
+
+# writes game state to file readable by vinvis if desired
 def write_gamestate(state):
     f = open(game_output, 'a')
     if f == None:
@@ -689,8 +649,23 @@ def write_gamestate(state):
         
     f.close()
     return
+    
+def erase_file():
+    f = open(game_output, 'w')
+    if f == None:
+        print 'error opening output file', game_output
+    else:
+        f.truncate(0)
+    f.close()
         
 # returns Manhattan distance from pos1 to pos2
 def get_distance(pos1, pos2):
     return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
+    
+def safety_check(dir):
+    direction = dir
+    if dir not in [NORTH, SOUTH, EAST, WEST]:
+        print 'Direction was None or invalid!!!'
+        direction = STAY
+    return direction
 

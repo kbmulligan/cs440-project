@@ -36,8 +36,7 @@ MOVE_PENALTY = {'SPAWN POINT': 10,
                 'ADJ ENEMY':3,
                 'PROHIBITED': 100}
 
-                
-########## UTILITY FUNCTIONS ##########
+                ########## UTILITY FUNCTIONS ##########
 
 # returns Manhattan distance from pos1 to pos2
 def get_distance(pos1, pos2):
@@ -60,7 +59,6 @@ def get_neighboring_locs(loc, board):
 
     return locs
 
-    
 class Pathfinder():
 
     # use A* to find the shortest path between two points
@@ -126,12 +124,35 @@ class Pathfinder():
         path.reverse()
 
         return path
+        
+    # returns direction to go based on start and destination coords
+    def get_dir_to(self, start, dest):
+        drow = dest[0] - start[0]
+        dcol = dest[1] - start[1]
+
+        # if N/S is greater than E/W difference, the make the N/S change first
+        if (abs(drow) > abs(dcol)):               
+            if (drow > 0):
+                d = SOUTH
+            elif (drow < 0):
+                d = NORTH
+            else:
+                d = STAY
+        else:
+            if (dcol > 0):
+                d = EAST
+            elif (dcol < 0):
+                d = WEST
+            else:
+                d = STAY
+
+        return d
 
     # returns the length of the path in moves
     def path_cost(self, path):
         return len(path) - 1
 
-    
+
 
     
 

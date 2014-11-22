@@ -11,7 +11,7 @@ import game
 import pathfinder
 import priorityqueue as pq
 
-BOTS = 4
+PLAYERS = 4
 
 # returns the avg of a list of coords
 def center_mass(locs):
@@ -69,7 +69,7 @@ def get_mine_count(hero_id, game):
     return mc
     
 def turns_left(game):
-    return (game.state['game']['maxTurns']/BOTS - game.state['game']['turn']/BOTS)
+    return (game.state['game']['maxTurns']/PLAYERS - game.state['game']['turn']/PLAYERS)
 
 # returns projected (at last turn) list of hero id's ordered from richest to poorest, given current game state
 def project_end_state(game):
@@ -93,5 +93,5 @@ def project_end_gold(hero, game):
 def project_gold_diff(hero1_id, hero2_id, game):
     return project_end_gold(game.get_hero_by_id(hero1_id), game) - project_end_gold(game.get_hero_by_id(hero2_id), game)
     
-def open_sides(mine, game):
-    return game.board.passables(pathfinder.find_neighboring_locs(mine))
+def accessible_sides(loc, game):
+    return len(game.board.passables(pathfinder.get_neighboring_locs(loc, game.board)))
