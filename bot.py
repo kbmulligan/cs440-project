@@ -288,14 +288,14 @@ class RamBot(Bot):
 
         return destination
         
-    def select_mine(self, game, random=False):
+    def select_mine(self, game, randomness=False):
         nearest = self.find_nearest_unowned_mines(game, mines_to_compare(game))
         print 'near mines', nearest
         if not nearest:
             self.goal = DEFEND
             goal = DEFEND
             dest = self.pos
-        elif random:
+        elif randomness:
             dest = random.choice(nearest)
         else:
             dest = self.choose_best(nearest)
