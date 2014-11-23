@@ -56,8 +56,15 @@ MIN_LEAD_MARGIN = 0.9
 NEVER_STOP = 100000
 
 BEER_COST = 2
+BEER_LIFE = 50
 MIN_MINES_TO_COMPARE = 4
 MAX_MINES_TO_COMPARE = 10
+CENTER_MASS_WEIGHT = 0.5
+TERRIBLE_SCORE = -1000
+
+ENEMIES_TO_COMPARE = 4
+
+WAYPOINTS = 1
 
 
 # for A*
@@ -139,9 +146,7 @@ class RamBot(Bot):
         ##### ADMIN COMPLETE - START WORKING ACTUAL MOVEMENT ########
         
         direction = None
-        if self.get_current_waypoint() == None:
-            self.goal = self.determine_goal(game)
-            self.add_waypoint(self.determine_dest(self.goal, game))
+        self.evaluate_waypoints()
 
         # Make progress toward destination
         if any(self.waypoints):
@@ -156,7 +161,7 @@ class RamBot(Bot):
         while (path == [self.pos, self.pos]):
             self.remove_current_waypoint()
             if not self.waypoints:
-                self.add_waypoint(self.determine_dest(self.goal, game, randomness=True))
+                self.add_waypoints(self.determine_dest(self.goal, game, randomness=True))
             next_wpt = self.get_current_waypoint()
             path = self.pf.get_path(self.pos, next_wpt, game.board, self.path_heuristic)
             searches += 1
@@ -198,11 +203,11 @@ class RamBot(Bot):
 
     def print_comparison_tests(self, game):
         print 'Comparisons...'
-        print 'Minecounts:'
-        print '1:', compare.get_mine_count(1, game)
-        print '2:', compare.get_mine_count(2, game)
-        print '3:', compare.get_mine_count(3, game)
-        print '4:', compare.get_mine_count(4, game)
+        # print 'Minecounts:'
+        # print '1:', compare.get_mine_count(1, game)
+        # print '2:', compare.get_mine_count(2, game)
+        # print '3:', compare.get_mine_count(3, game)
+        # print '4:', compare.get_mine_count(4, game)
         
         # for hero_loc in game.heroes_locs:
             # print hero_loc, compare.get_hero_value(hero_loc, game)
@@ -215,16 +220,11 @@ class RamBot(Bot):
         print 'Hero', order[0], 'will win by:', compare.project_gold_diff(order[0], order[1], game), 'gold'
         
         # print 'Top 5 Targets by Value:' 
-        # locs = game.others_mines_locs.keys() + game.other_heroes_locs.keys()
-        # for loc in compare.sort_by_highest_value(locs, game)[:5]:
-            # if loc in game.mines_locs:
-                # print 'Mine', loc
-            # elif loc in game.heroes_locs:
-                # print 'Hero', loc
-            # else:
-                # print 'Neither?', loc
-                
-        print 'self.pos accessible sides =', compare.accessible_sides(self.pos, game)
+        for target in compare.highest_value_targets(game, 4):
+            if target in game.other_heroes_locs and target != self.pos:
+                print 'Hero', target
+            else:
+                print 'Mine', target
         
         return
     
@@ -237,7 +237,7 @@ class RamBot(Bot):
         order = compare.project_end_state(game)
         
         desired_lead_margin = (DESIRED_LEAD_MARGIN - MIN_LEAD_MARGIN) * \
-            compare.turns_left(game)/(game.state['game']['maxTurns']/4) + MIN_LEAD_MARGIN
+            compare.turns_left(game)/(game.state['game']['maxTurns']/PLAYERS) + MIN_LEAD_MARGIN
         if (compare.projected_winner(game) == self.identity and \
                 compare.project_gold_diff(order[0], order[1], game) > \
                 compare.project_end_gold(game.get_hero_by_id(self.identity), game) \
@@ -245,41 +245,67 @@ class RamBot(Bot):
             goal = DEFEND
 
         life_threshold = (LIFE_THRESHOLD - MIN_LIFE) / (order.index(self.identity) + 1) + MIN_LIFE
-        if (self.life < life_threshold and self.can_buy()): # healing override
+        if (self.life < life_threshold and self.can_buy(1)):                             # healing override
             goal = HEAL
-
+        
+        targets = compare.highest_value_targets(game, ENEMIES_TO_COMPARE)               # grab all targets
+        hero_targets = [x for x in targets if x in game.heroes_locs and x != self.pos]  # filter for heroes
+        if hero_targets:
+            target = hero_targets[0]                                                    # select most valuable
+            enemy_life = game.other_heroes_locs[target]
+            if (self.life > enemy_life):
+                goal = FIGHT
+        
         return goal
 
     # return destination based on goal
     def determine_dest (self, goal, game, randomness=False):
-        destination = None
+        destination = []
 
         if goal == EXPAND:
-            nearest_mines = self.find_nearest_unowned_mines(game, mines_to_compare(game))
-            print 'near mines', nearest_mines
-            if not nearest_mines:
-                self.goal = DEFEND
-                goal = DEFEND
-                destination = self.pos
-            elif randomness:
-                destination = random.choice(nearest_mines)
-            else:
-                destination = self.choose_best(nearest_mines)
+            destination.append(self.select_mine(game, randomness))
         
         if goal == DEFEND:
-            destination = self.pos
+            destination.append(self.pos)
 
         if goal == HEAL:
             if randomness:
-                destination = random.choice(self.find_nearest_obj('tavern', game))
+                destination.append(random.choice(self.find_nearest_obj('tavern', game)))
             else:
-                destination = self.find_nearest_obj('tavern', game)[0]
+                destination.append(self.find_nearest_obj('tavern', game)[0])
+                
+            if self.life + BEER_LIFE - get_distance(self.pos, destination[0]) < FULL_LIFE:
+                destination.append(destination[0])
+                print destination
             
         if goal == FIGHT:
-            destination = self.pos
-
+            targets = compare.highest_value_targets(game, ENEMIES_TO_COMPARE)
+            marks = [x for x in targets if x in game.heroes_locs and x != self.pos]
+            if marks:
+                destination.append(marks[0])
+            else:
+                destination.append(self.find_nearest_obj('enemy', game)[0])
 
         return destination
+        
+    def select_mine(self, game, random=False):
+        nearest = self.find_nearest_unowned_mines(game, mines_to_compare(game))
+        print 'near mines', nearest
+        if not nearest:
+            self.goal = DEFEND
+            goal = DEFEND
+            dest = self.pos
+        elif random:
+            dest = random.choice(nearest)
+        else:
+            dest = self.choose_best(nearest)
+        return dest
+    
+    # configure and optimize waypoints based on goal/health
+    def evaluate_waypoints(self):
+        self.goal = self.determine_goal(self.knowledge['GAME'])
+        while len(self.waypoints) < WAYPOINTS:
+            self.add_waypoints(self.determine_dest(self.goal, self.knowledge['GAME']))
 
     def get_current_waypoint(self):
         wpt = None
@@ -295,9 +321,11 @@ class RamBot(Bot):
         self.waypoints = []
 
     def add_waypoint(self, wpt):
-        # wpts = list(add_wpt)
-        # for wpt in wpts:
         self.waypoints.append(wpt)
+    
+    def add_waypoints(self, wpts):
+        for wpt in wpts:
+            self.add_waypoint(wpt)
 
     def insert_immediate_waypoint(self, wpt):
         self.waypoints.insert(0, wpt)
@@ -305,14 +333,18 @@ class RamBot(Bot):
     def set_goal(self, newGoal):
         self.goal = newGoal
 
+    def life_threshold(self, game):
+        order = compare.project_end_state(game)
+        return (LIFE_THRESHOLD - MIN_LIFE) / (order.index(self.identity) + 1) + MIN_LIFE
+    
     def healthy(self):
-        return self.life > LIFE_THRESHOLD
+        return self.life > self.life_threshold(self.knowledge['GAME'])
 
     def missing_life(self):
         return FULL_LIFE - self.life
 
-    def can_buy(self):
-        return self.gold >= BEER_COST
+    def can_buy(self, beers):
+        return self.gold >= BEER_COST * beers
         
     # update self state vars
     def update(self, game):
@@ -343,15 +375,6 @@ class RamBot(Bot):
         control_pts.append(self.spawn)
         self.hub = compare.center_mass(control_pts)
 
-    def record_move(self, dir):
-        self.moves[dir] += 1
-
-    def just_died(self):
-        died = False
-        if (len(self.loc_history) > 1):
-            died = get_distance(self.loc_history[-1], self.loc_history[-2]) > 1
-        return died
-
     def summary(self):
         history = self.loc_history
         if (len(history) > STEPS_TO_DISPLAY):
@@ -369,6 +392,15 @@ class RamBot(Bot):
             # + '  ID: ' + str(self.identity)
             # + '  Crashed: ' + str(self.crashed)
             # + '  Dest: ' + str(self.get_current_waypoint()) + \
+            
+    def record_move(self, dir):
+        self.moves[dir] += 1
+
+    def just_died(self):
+        died = False
+        if (len(self.loc_history) > 1):
+            died = get_distance(self.loc_history[-1], self.loc_history[-2]) > 1
+        return died
 
     def choose_best(self, locs):
         best = None
@@ -390,7 +422,10 @@ class RamBot(Bot):
         board = self.knowledge['GAME'].board
         
         gold_value = compare.gold_value(loc, self.knowledge['GAME'])
-        path_length = len(self.pf.get_path(self.pos, loc, board, self.path_heuristic)) - 1
+        path = self.pf.get_path(self.pos, loc, board, self.path_heuristic)
+        if (path == [self.pos, self.pos]):
+            return TERRIBLE_SCORE
+        path_length = len(path) - 1
         
         # self.hub is the middle of all owned mines and spawn point
         if self.hub:
@@ -401,7 +436,7 @@ class RamBot(Bot):
         # total score accounts for time taken to capture and normalizes for that same cost
         # this essential leaves you with future value per move spent, optimizing the use of each move
         score += (float(gold_value) - path_length) / path_length
-        score -= dhub 
+        score -= float(dhub) * CENTER_MASS_WEIGHT
         
         print 'Score', loc, ' val:', gold_value, 'path len:', path_length, 'dCenter:', dhub, '  Score:', score
         return score

@@ -95,3 +95,8 @@ def project_gold_diff(hero1_id, hero2_id, game):
     
 def accessible_sides(loc, game):
     return len(game.board.passables(pathfinder.get_neighboring_locs(loc, game.board)))
+
+# returns x number of targets by highest value in the game
+def highest_value_targets(game, x):    
+    locs = game.others_mines_locs.keys() + game.other_heroes_locs.keys()
+    return sort_by_highest_value(locs, game)[:x]
