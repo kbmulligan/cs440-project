@@ -13,7 +13,7 @@ from priorityqueue import PriorityQueue
 
 VERBOSE_ASTAR = False
 
-PATHFINDER_TIMEOUT = 0.25
+PATHFINDER_TIMEOUT = 0.15
 
 PLAYERS = 4
 HERO_IDs = ['1', '2', '3', '4']
@@ -83,7 +83,7 @@ class Pathfinder():
 
         while not frontier.is_empty():
         
-            if (t0 - time.time() > PATHFINDER_TIMEOUT):
+            if (time.time() - t0 > PATHFINDER_TIMEOUT):
                 print 'PATHFINDING TIMEOUT: Averting disconnect...'
                 print '    get_path: Probably could not find a valid path from', start, 'to', end
                 return [start, start] 
