@@ -146,7 +146,7 @@ class RamBot(Bot):
         ##### ADMIN COMPLETE - START WORKING ACTUAL MOVEMENT ########
         
         direction = None
-        self.evaluate_waypoints()
+        self.evaluate_waypoints()   # This version seems to do well
 
         # Make progress toward destination
         if any(self.waypoints):
