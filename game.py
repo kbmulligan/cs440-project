@@ -31,14 +31,15 @@ class MineTile:
         return 'M' + str(self.heroId)
 
 class Game:
-    def __init__(self, state, myHeroName, parseBoard=True):
+    def __init__(self, state, myHeroId, parseBoard=True):
         
         self.turn = state['game']['turn']
         self.maxTurns = state['game']['maxTurns']
         
         self.heroes = [Hero(state['game']['heroes'][i]) for i in range(len(state['game']['heroes']))]
-        
-        self.myHeroName = myHeroName
+       
+        self.myHeroId = myHeroId 
+        self.myHeroName = None
         self.myHero = None 
         
         self.heroes_locs = {}
@@ -49,8 +50,8 @@ class Game:
             #setup all hero locations
 #             self.heroes_locs[(hero.pos['y'], hero.pos['x'])] = hero.id
 
-            if hero.name == myHeroName:
-                self.myHeroId = hero.id
+            if hero.id == myHeroId:
+                self.myHeroName = hero.name
                 self.myHero = hero
             else:
                 #populate other_heroes_loc

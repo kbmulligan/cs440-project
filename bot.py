@@ -12,7 +12,8 @@ import time
 import sys
 from game import Game, Board, MineTile, HeroTile
 from priorityqueue import PriorityQueue
-from minimax import Vindinium, alphabeta_search, HEAL_ACTION
+from minimax import Vindinium, HEAL_ACTION, \
+    multiplayer_minimax_search
 
 BOT_NAME = 'nitorbot'
 
@@ -103,8 +104,10 @@ class RamBot(Bot):
     # called each turn, updates hero state, returns direction of movement hero bot chooses to go
     def move(self, state):
         t0 = time.time()
+        
+        myId = state['hero']['id']
 
-        game = Game(state, self.name)
+        game = Game(state, myId) 
         self.update(game)
 
         if self.turn <= 1:
@@ -187,7 +190,8 @@ class RamBot(Bot):
         goal = None
         
         miniMax = Vindinium(game.myHeroName, state)
-        miniAction = alphabeta_search(miniMax, d=1)
+#         miniAction = alphabeta_search(miniMax, d=1)
+        miniAction = multiplayer_minimax_search(miniMax, d=1)
         
         lowerLifeThres = 40
         

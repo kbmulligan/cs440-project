@@ -10,6 +10,7 @@ from game import Game
 from math import ceil, log
 from time import time
 from copy import deepcopy
+from random import random
 
 STAY_ACTION = 'STAY'
 ATTACK_TROLL_ACTION = 'ATTACK_TROLL'
@@ -75,20 +76,20 @@ class Vindinium(MiniMaxGame):
         playerName = state['game']['heroes'][playerId ]['name']
         
         #parse game object and get moves for other chars
-        game = Game(state, playerName, parseBoard)
+        game = Game(state, playerId + 1, parseBoard)
          
         #go over other people's mines, and create actions for those
 #         for minePos, ownerId in game.others_mines_locs.iteritems():
         for minePos, ownerId in game.state['game']['board']['mines'].iteritems():
             if ownerId != str(playerId + 1):
                 availActions.append((ATTACK_TROLL_ACTION, minePos, ownerId))
-        """    
+        
         #do the same for adversaries
 #         for opPos, opId in game.other_heroes_locs.iteritems():
         for hero in game.state['game']['heroes']:
             if hero['id'] != (playerId + 1):
-                availActions.append((ATTACK_PLAYER_ACTION, (hero['pos']['y'], hero['pos']['x']), hero['id']))
-        """    
+                availActions.append((ATTACK_PLAYER_ACTION, (hero['pos']['x'], hero['pos']['y']), hero['id']))
+        
         """#actions for health
         for barPos in game.taverns_locs:
             availActions.append((HEAL_ACTION, barPos))
@@ -116,8 +117,14 @@ class Vindinium(MiniMaxGame):
         state['game']['lastPlayerZeroId'] = playerId
         
         #parse state
-        game = Game(state, playerName, False)
+        game = Game(state, playerId + 1, False)
         myHeroPos = state['game']['heroes'][playerId]['pos']
+        
+        #flip game's x/y coords for player pos
+        #when you look at the map, i use y as vertical axis and x as horizontal
+        #appears that the pos[x/y] values are opposite from that
+        myHeroPosY = myHeroPos['x']
+        myHeroPosX = myHeroPos['y']
         
         numMoves = 0
         
@@ -136,16 +143,21 @@ class Vindinium(MiniMaxGame):
             ownerId = move[2]
             
             #calculate number of moves to location
-            numMoves = self.calculateNumberOfMoves((myHeroPos['y'], myHeroPos['x']), trollPos)
+            numMoves = self.calculateNumberOfMoves((myHeroPosY, myHeroPosX), trollPos)
+            
+            if playerId == 0:
+                print "\nAttackTroll @ pos: " + str(trollPos) + " myPos: " + str(myHeroPos) + " numMoves: " + str(numMoves)
             
             #adjust health for fight with troll and trip
             newLife = game.myHero.life - 20 - 5 #5 is a hard coded number to take into account moves from health fill up to fight
             newMines = game.myHero.mineCount
 
             #account for gold earned on the trip there
-            newGold = game.myHero.gold + (numMoves * newMines)
+#             newGold = game.myHero.gold + (numMoves * newMines)
+            newGold = game.myHero.gold 
             
-            if newLife > 0:
+#             if newLife > 0:
+            if True:
                 #victory increase # mines and gold 
                 newMines = newMines + 1
                 newGold = newGold + newMines
@@ -167,7 +179,7 @@ class Vindinium(MiniMaxGame):
             #update state
             state['game']['heroes'][playerId]['gold'] = newGold
             state['game']['heroes'][playerId]['mineCount'] = newMines
-            state['game']['heroes'][playerId]['life'] = newLife
+#             state['game']['heroes'][playerId]['life'] = newLife
             state['game']['heroes'][playerId]['pos']['y'] = trollPos[0]
             state['game']['heroes'][playerId]['pos']['x'] = trollPos[1]
             
@@ -180,13 +192,16 @@ class Vindinium(MiniMaxGame):
             opponentId = int(move[2])
             
             #calculate number of moves to location
-            numMoves = self.calculateNumberOfMoves((myHeroPos['y'], myHeroPos['x']), playerPos)
+            numMoves = self.calculateNumberOfMoves((myHeroPosY, myHeroPosX), playerPos)
            
             #min number of moves is 1
             if numMoves == 0:
                 numMoves = 1
+                
+            #hard code life subtraction since we heal when we get too low
+            travelHealthHit = 5
             
-            lifeAfterMoves = game.myHero.life - numMoves
+            lifeAfterMoves = game.myHero.life - travelHealthHit
             
             newLife = 0
             newMines = game.myHero.mineCount
@@ -219,6 +234,10 @@ class Vindinium(MiniMaxGame):
 
                 #set their mine count to 0
                 state['game']['heroes'][opponentId - 1]['mineCount'] = 0
+                
+                #put opponent back at their spawn point
+                state['game']['heroes'][opponentId -1]['pos']['y'] = state['game']['heroes'][opponentId - 1]['spawnPos']['y']
+                state['game']['heroes'][opponentId -1]['pos']['x'] = state['game']['heroes'][opponentId - 1]['spawnPos']['x']
                 
                 #move our position to their location
                 state['game']['heroes'][game.myHeroId -1]['pos']['y'] = playerPos[0]
@@ -265,8 +284,8 @@ class Vindinium(MiniMaxGame):
             #update state
             state['game']['heroes'][game.myHeroId -1]['gold'] = newGold
             state['game']['heroes'][game.myHeroId -1]['life'] = newLife
-            state['game']['heroes'][game.myHeroId -1]['pos']['x'] = barPos[0]
-            state['game']['heroes'][game.myHeroId -1]['pos']['y'] = barPos[1]
+            state['game']['heroes'][game.myHeroId -1]['pos']['x'] = barPos[1]
+            state['game']['heroes'][game.myHeroId -1]['pos']['y'] = barPos[0]
             
         #update gold for all other heroes in game
         for hero in game.heroes:
@@ -289,50 +308,67 @@ class Vindinium(MiniMaxGame):
         #terminal state going to be when turn# == maxTurns
         retVal = False
         
-        game = Game(state, self.myHeroName, parseBoard=False)
+#         game = Game(state, self.myHeroName, parseBoard=False)
         
         #if myHero's life is 0 or less, it's a terminal state
-        if game.state['game']['finished'] == "True":
+        if state['game']['finished'] == "True":
             retVal = True
             
         return retVal
     
     def utility(self, state):
-        "Return the value of this final state to player."
-        #value is going to be the amount of utility
+        "Return the value of each player as a vector. index in the vector is their 0based index in the heroes list" 
         
-#         game = Game(state, self.myHeroName, parseBoard=False)
+        eachPlayersGoldAndNumMoves = []
+        allPlayersGoldSum = 0
         
-#         if game.myHero.life <= 0:
-#             utility = -infinity
-#         else:
-
-        playerId = -1
-        
-        #get player name based off of 
-        playerName = state['game']['lastPlayer']
-            
-        othersGoldCount = []
         for hero in state['game']['heroes']:
-            if hero['name'] != playerName:
-                othersGoldCount.append(hero['gold'])
-                #add amount of life to utility
-            else:
-                #get this player's id
-                playerId = int(hero['id'])
+            
+            thisHeroGold = hero['gold']
+            
+            #get number of moves and check if dict key doesn't exist
+            numMoves = 0
+            
+            try:
+                numMoves = hero['numMoves']
+            except:
+                hero['numMoves'] = -1
+            
+            #append to vector tuple of player gold and numMoves to this state
+            eachPlayersGoldAndNumMoves.append((hero['gold'], numMoves))
+            
+            #add to sum of all players gold
+            allPlayersGoldSum  = allPlayersGoldSum +  thisHeroGold
+            
+        #go over each item in vector and calculate the utility for each person
+        utilityVector = []
+        
+        for goldAndMoves in eachPlayersGoldAndNumMoves:
+            
+            gold = goldAndMoves[0]
+            numMovesToGetHere = goldAndMoves[1]
+            
+            opponentsGoldSum = allPlayersGoldSum - gold
+            
+            reduceMoves = 0
+            
+            if numMovesToGetHere != 0:
+                #add small random values to help prevent ties
+                reduceMoves = log(int(numMovesToGetHere)) + random()
                 
-        oppenentsGoldSum = sum(othersGoldCount)
-       
-        numMovesToGetHere = state['game']['heroes'][playerId -1 ]['numMoves']
+            #proximity premium
+            proxBonus = 0
+            if numMovesToGetHere <= 3 and numMovesToGetHere >= 0:
+                proxBonus = 100
+                
         
-        reduceMoves = 0
-        
-        if numMovesToGetHere != 0:
-            reduceMoves = log(int(numMovesToGetHere))
-        
-        utility = (state['game']['heroes'][playerId -1]['gold'] - oppenentsGoldSum) - reduceMoves
-#         utility = utility * -1
-        return utility
+            utility = gold - numMovesToGetHere + proxBonus
+#             utility = gold - opponentsGoldSum - reduceMoves
+            
+#             utilityVector.append(utility)
+            utilityVector.append(utility)
+            
+        return utilityVector
     
     def calculateNumberOfMoves(self, curPos, destPos):
         #this is the number of moves assuming no obstacles
@@ -353,7 +389,94 @@ def pretty_map(game):
             output += game.state['game']['board']['tiles'][begin:end] + '\n'
 
         return output
+    
+def getZeroBasedPlayerIdForThisTurn(state):
         
+        globalTurn = state['game']['turn']
+        playerId = (globalTurn % 4) 
+        
+        return playerId
+    
+    
+def multiplayer_minimax_search(miniMaxGame, d=4, cutoff_test=None, eval_fn=None):
+    
+    #get the initial state for all subsequent moves by us
+    initialState = miniMaxGame.initial
+    
+    def multiplayer_max_value(state, depth):
+        #check if terminal or depth to deep
+        if cutoff_test(state, depth):
+            evalVal = eval_fn(state)
+            return evalVal
+        
+        #initial value
+        bestScoreForThisPlayer = -infinity
+        bestTuple = None
+
+        
+        #get all possible actions for this_player in this state
+        actionList = miniMaxGame.actions(state)
+        
+        #get this_player zero based id and name
+        thisTurn_player_id = getZeroBasedPlayerIdForThisTurn(state)
+        thisTurn_player_name = state['game']['heroes'][thisTurn_player_id]['name']
+        
+        #go over every action and get the value for it
+        for action in actionList:
+            #get state resulting from this action
+            newState = miniMaxGame.result(state, action)
+            
+            #get this player's utility from the move
+            newTuple = multiplayer_max_value(newState, depth + 1)
+            thisPlayerUtility = newTuple[thisTurn_player_id]
+            
+            bestScoreForThisPlayer = max(bestScoreForThisPlayer, thisPlayerUtility)
+            
+            #if bestScore... == thisPlayerUtility, take this tuple as the best tuple
+            if bestScoreForThisPlayer == thisPlayerUtility:
+                bestTuple = newTuple
+            
+            
+#         print thisTurn_player_name + "[" + str(thisTurn_player_id) + "] best value is: " + str(bestScoreForThisPlayer) + " : " + str(bestTuple)
+#         print str(state['game']['turn']) + " globalTurn"
+#         print "\n"
+        return bestTuple
+            
+    
+    def getOurPlayerId(state):
+        return int(state['hero']['id'])
+    
+    def performActionAndSendStateIntoMultiPlayerMaxVal(action):
+        newState = miniMaxGame.result(initialState, action)
+        
+        maxTuple = multiplayer_max_value(newState, 0)
+        
+        #get our score from this tuple
+        ourHeroId = newState['hero']['id']
+        ourZeroIndexId = ourHeroId -1
+        
+        if newState['hero']['pos']['y'] == 4 and newState['hero']['pos']['x'] == 6:
+            pass
+        
+        ourMaxVal = maxTuple[ourZeroIndexId]
+        
+        return ourMaxVal
+    
+    # Body of alphabeta_search starts here:
+    # The default test cuts off at depth d or at a terminal state
+    cutoff_test = (cutoff_test or
+                   (lambda state,depth: depth>d or miniMaxGame.terminal_test(state)))
+    
+    #calculates the utility tuple
+    eval_fn = eval_fn or (lambda state: miniMaxGame.utility(state))
+    
+    #action list that is used to prime the dfs 
+    actionList = miniMaxGame.actions(miniMaxGame.initial, True)
+    print "actionList: " + str(actionList)
+    
+    #will return the highest value action from actionList
+    maxAction = argmax(actionList, performActionAndSendStateIntoMultiPlayerMaxVal)
+    return maxAction
         
     
 def alphabeta_search(miniMaxGame, d=4, cutoff_test=None, eval_fn=None):
@@ -400,7 +523,6 @@ def alphabeta_search(miniMaxGame, d=4, cutoff_test=None, eval_fn=None):
         return playerId
     
     def getOurPlayerId(state):
-        
         return int(state['hero']['id'])
         
     

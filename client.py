@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import os
 import sys
 import requests
-import re
 import time
 from bot import RandomBot, SlowBot, RamBot, ManualBot
 
