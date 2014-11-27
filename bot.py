@@ -15,6 +15,8 @@ from game import Game, Board, MineTile, HeroTile
 from priorityqueue import PriorityQueue
 import pathfinder
 import compare
+from minimax import Vindinium, HEAL_ACTION, \
+    multiplayer_minimax_search
 
 BOT_NAME = 'nitorbot'
 
@@ -85,6 +87,7 @@ game_output = 'lastgame.vin'
 
 class Bot:
     identity = 0
+    globalTurn = 0
     turn = 0
     pos = ()
     life = 0
@@ -108,7 +111,7 @@ class RamBot(Bot):
     mode = 'WAIT'
 
     # goal is one of ('EXPAND', 'DEFEND', 'HEAL', 'FIGHT', 'WANDER')
-    goal = 'EXPAND'
+    goal = ('EXPAND')
 
     # waypoints is list of coords of planned destinations, waypoints[0] is next immediate destination
     waypoints = []
@@ -122,6 +125,7 @@ class RamBot(Bot):
         self.moves[SOUTH] = 0
         self.moves[EAST] = 0
         self.moves[WEST] = 0
+        self.lastAction = None
     
     # called each turn, updates hero state, returns direction of movement hero bot chooses to go
     def move(self, state):
@@ -129,7 +133,10 @@ class RamBot(Bot):
         
         ##### ADMIN AND GAME MANAGEMENT #############################
         t0 = time.time()
-        game = Game(state, self.name)
+        
+        myId = state['hero']['id']
+
+        game = Game(state, myId) 
         
         if self.turn < 2:
             self.game_setup(game)
@@ -146,8 +153,45 @@ class RamBot(Bot):
         ##### ADMIN COMPLETE - START WORKING ACTUAL MOVEMENT ########
         
         direction = None
-        self.evaluate_waypoints()   # This version seems to do well
+        
+        #reeval goal every time
+        self.goal = self.determine_goal(game, state)
+        print "executing goal: " + str(self.goal)
+        
+        #clear all waypoints
+        self.remove_all_waypoints()
+       
+        if self.goal[0] == HEAL:
+            
+            self.add_waypoint(self.determine_dest(HEAL, game)[0])
+            
+        else:
+            self.add_waypoint((self.goal[1][0], self.goal[1][1]))
+        
+        if self.get_current_waypoint():
+            #TODO see brett's calculation for when to heal
+            #if health is low, go heal
+            """if game.myHero.life < 30:
+                self.remove_all_waypoints()
+                self.add_waypoint(self.determine_dest(HEAL, game))
+            """
+            self.mode = TRAVEL
 
+            path = self.pf.get_path(self.pos, self.get_current_waypoint(), game.board, self.path_heuristic)
+            
+            #make sure we have a valid path, if not revert to heal
+            while (path == [self.pos, self.pos]) and self.goal != DEFEND:
+                self.remove_current_waypoint()
+                
+                self.add_waypoint(self.determine_dest(HEAL, game, randomness=True)[0])
+                
+                path = self.pf.get_path(self.pos, self.get_current_waypoint(), game.board, self.path_heuristic)
+                
+            
+        ###self.evaluate_waypoints()   # This version seems to do well
+        
+
+        """
         # Make progress toward destination
         if any(self.waypoints):
             wpt = self.get_current_waypoint()
@@ -168,6 +212,7 @@ class RamBot(Bot):
             if searches > MAX_SEARCHES:
                 path = [self.pos, self.pos]
                 break
+        """
 
         print 'Current path:', path
         print 'Distance:', len(path) - 1
@@ -182,13 +227,13 @@ class RamBot(Bot):
         print 'Direction:', direction
 
         # test if bot has arrived at waypoint
-        if game.board.to(self.pos, direction) == self.get_current_waypoint():
-            self.remove_current_waypoint()
+        #if game.board.to(self.pos, direction) == self.get_current_waypoint():
+        #    self.remove_current_waypoint()
 
 
         ##### MORE INFORMATION AND TIME/GAME MANAGEMENT #############
         print ''
-        self.print_comparison_tests(game)
+#         self.print_comparison_tests(game)
 
         # Safety check -- I think bad dirs can cause HTTP 400 Errors - kbm
         direction = safety_check(direction)
@@ -229,10 +274,10 @@ class RamBot(Bot):
         return
     
     # returns goal based on game state
-    def determine_goal (self, game):
+    def determine_goal (self, game, state):
         goal = None
 
-        goal = EXPAND                                       # default
+        goal = (EXPAND,0)                                       # default
         
         order = compare.project_end_state(game)
         
@@ -242,19 +287,29 @@ class RamBot(Bot):
                 compare.project_gold_diff(order[0], order[1], game) > \
                 compare.project_end_gold(game.get_hero_by_id(self.identity), game) \
                 * desired_lead_margin + NEVER_STOP):
-            goal = DEFEND
+            goal = (DEFEND,self.pos)
 
-        life_threshold = (LIFE_THRESHOLD - MIN_LIFE) / (order.index(self.identity) + 1) + MIN_LIFE
-        if (self.life < life_threshold and self.can_buy(1)):                             # healing override
-            goal = HEAL
+#         life_threshold = (LIFE_THRESHOLD - MIN_LIFE) / (order.index(self.identity) + 1) + MIN_LIFE
+        life_threshold = 30
+        if (self.life < life_threshold and self.can_buy(1)  or 
+            (self.lastAction != None and self.lastAction[0] == HEAL_ACTION and self.life < 80)):                             # healing override
+            goal = (HEAL,0)
         
-        targets = compare.highest_value_targets(game, ENEMIES_TO_COMPARE)               # grab all targets
+        """targets = compare.highest_value_targets(game, ENEMIES_TO_COMPARE)               # grab all targets
         hero_targets = [x for x in targets if x in game.heroes_locs and x != self.pos]  # filter for heroes
         if hero_targets:
             target = hero_targets[0]                                                    # select most valuable
             enemy_life = game.other_heroes_locs[target]
             if (self.life > enemy_life):
                 goal = FIGHT
+        """
+        if goal[0] == EXPAND:
+            #don't come in here if we already set to heal or defend
+            miniMax = Vindinium(game.myHeroName, state)
+            #         miniAction = alphabeta_search(miniMax, d=1)
+            goal = multiplayer_minimax_search(miniMax, d=1)
+            
+        self.lastAction = goal
         
         return goal
 
@@ -272,11 +327,14 @@ class RamBot(Bot):
             if randomness:
                 destination.append(random.choice(self.find_nearest_obj('tavern', game)))
             else:
-                destination.append(self.find_nearest_obj('tavern', game)[0])
+                nearestTavernLoc = self.find_nearest_obj('tavern', game)[0]
                 
-            if self.life + BEER_LIFE - get_distance(self.pos, destination[0]) < FULL_LIFE:
+                destination.append(nearestTavernLoc)
+                
+            """if self.life + BEER_LIFE - get_distance(self.pos, destination[0]) < FULL_LIFE:
                 destination.append(destination[0])
                 print destination
+            """
             
         if goal == FIGHT:
             targets = compare.highest_value_targets(game, ENEMIES_TO_COMPARE)
@@ -349,6 +407,7 @@ class RamBot(Bot):
     # update self state vars
     def update(self, game):
         self.turn = game.state['game']['turn'] / PLAYERS + 1
+        self.globalTurn = game.state['game']['turn']
         
         for hero in game.heroes:
             if hero.name == self.name:
@@ -381,10 +440,11 @@ class RamBot(Bot):
             history = history[-STEPS_TO_DISPLAY:]
         # print 'History:', history
 
-        return 'Turn: ' + str(self.turn) + '  pos: ' + str(self.pos) + \
+        return 'Id: ' + str(self.identity) + ' Turn: ' + str(self.turn) + '/' + str(self.globalTurn) + '  pos: ' + str(self.pos) + \
             '  $: ' + str(self.gold) + '  Life: ' + str(self.life) + \
             '  Mines: ' + str(self.mineCount) + \
-            '  Mode: ' + self.goal + \
+            '  Mode: ' + str(self.goal) + \
+            '  Dest: ' + str(self.get_current_waypoint()) + \
             '  Deaths: ' + str(self.deaths) + \
             '\nHistory: ' + str(history) + \
             '\nWpts: ' + str(self.waypoints)
