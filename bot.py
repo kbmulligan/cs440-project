@@ -290,7 +290,7 @@ class RamBot(Bot):
             goal = (DEFEND,self.pos)
 
 #         life_threshold = (LIFE_THRESHOLD - MIN_LIFE) / (order.index(self.identity) + 1) + MIN_LIFE
-        life_threshold = 30
+        life_threshold = 40
         if (self.life < life_threshold and self.can_buy(1)  or 
             (self.lastAction != None and self.lastAction[0] == HEAL_ACTION and self.life < 80)):                             # healing override
             goal = (HEAL,0)
