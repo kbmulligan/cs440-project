@@ -11,6 +11,9 @@ from math import ceil, log
 from time import time
 from copy import deepcopy
 from random import random
+from multiprocessing import Pool
+# from pathos.pp import ParallelPythonPool as Pool
+from timeit import itertools
 
 STAY_ACTION = 'STAY'
 ATTACK_TROLL_ACTION = 'ATTACK_TROLL'
@@ -475,8 +478,85 @@ def multiplayer_minimax_search(miniMaxGame, d=4, cutoff_test=None, eval_fn=None)
     print "actionList: " + str(actionList)
     
     #will return the highest value action from actionList
-    maxAction = argmax(actionList, performActionAndSendStateIntoMultiPlayerMaxVal)
+#     maxAction = argmax(actionList, performActionAndSendStateIntoMultiPlayerMaxVal)
+
+#     pool = Pool(processes=len(actionList))
+    pool = Pool(processes=2)
+    
+    actionResult = pool.map(performActionAndSendStateIntoMultiPlayerMaxVali2, itertools.izip(actionList, itertools.repeat(miniMaxGame), itertools.repeat(initialState), itertools.repeat(d)))
+    
+    maxAction = actionResult[0][0]
+    maxScore = actionResult[0][1]
+    
+    for result in actionResult:
+        thisScore = result[1]
+        
+        if thisScore > maxScore:
+            maxScore = thisScore
+            maxAction = result[0]
+    
+    print "maxAction: " + str(maxAction) + " score: " + str(maxScore)
+    
     return maxAction
+
+def multiplayer_max_value2(state, depth, miniMaxGame, cutoff_test, eval_fn):
+        #check if terminal or depth to deep
+        if cutoff_test(state, depth):
+            evalVal = eval_fn(state)
+            return evalVal
+        
+        #initial value
+        bestScoreForThisPlayer = -infinity
+        bestTuple = None
+
+        
+        #get all possible actions for this_player in this state
+        actionList = miniMaxGame.actions(state)
+        
+        #get this_player zero based id and name
+        thisTurn_player_id = getZeroBasedPlayerIdForThisTurn(state)
+        thisTurn_player_name = state['game']['heroes'][thisTurn_player_id]['name']
+        
+        #go over every action and get the value for it
+        for action in actionList:
+            #get state resulting from this action
+            newState = miniMaxGame.result(state, action)
+            
+            #get this player's utility from the move
+            newTuple = multiplayer_max_value2(newState, depth + 1, miniMaxGame, cutoff_test, eval_fn)
+            thisPlayerUtility = newTuple[thisTurn_player_id]
+            
+            bestScoreForThisPlayer = max(bestScoreForThisPlayer, thisPlayerUtility)
+            
+            #if bestScore... == thisPlayerUtility, take this tuple as the best tuple
+            if bestScoreForThisPlayer == thisPlayerUtility:
+                bestTuple = newTuple
+            
+            
+#         print thisTurn_player_name + "[" + str(thisTurn_player_id) + "] best value is: " + str(bestScoreForThisPlayer) + " : " + str(bestTuple)
+#         print str(state['game']['turn']) + " globalTurn"
+#         print "\n"
+        return bestTuple
+
+def performActionAndSendStateIntoMultiPlayerMaxVali2((action, miniMaxGame, initialState, d)):
+    print "action: " + str(action)
+    newState = miniMaxGame.result(initialState, action)
+    
+    cutoff_test = ((lambda state,depth: depth>d or miniMaxGame.terminal_test(state)))
+    
+    #calculates the utility tuple
+    eval_fn = (lambda state: miniMaxGame.utility(state))
+    
+    maxTuple = multiplayer_max_value2(newState, 0, miniMaxGame, cutoff_test, eval_fn)
+    
+    #get our score from this tuple
+    ourHeroId = newState['hero']['id']
+    ourZeroIndexId = ourHeroId -1
+    
+    ourMaxVal = maxTuple[ourZeroIndexId]
+    
+    return (action, ourMaxVal)
+
         
     
 def alphabeta_search(miniMaxGame, d=4, cutoff_test=None, eval_fn=None):
