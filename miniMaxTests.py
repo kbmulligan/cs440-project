@@ -200,6 +200,8 @@ class Test(unittest.TestCase):
         tdiff = time() - t0
         print "took : " + str(tdiff) + " sec"
         print "timeBigGameBoard\n"
+        print "tiles: " + str(initial['game']['board']['size'])
+
         print move
         
 

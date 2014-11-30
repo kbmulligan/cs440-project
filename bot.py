@@ -307,7 +307,16 @@ class RamBot(Bot):
             #don't come in here if we already set to heal or defend
             miniMax = Vindinium(game.myHeroName, state)
             #         miniAction = alphabeta_search(miniMax, d=1)
-            goal = multiplayer_minimax_search(miniMax, d=1)
+          
+            #default depth 
+            d = 1 
+            #determine depth of search based off of board size
+            if state['game']['board']['size'] > 18:
+                #only look at our player
+                d = 0
+                
+            
+            goal = multiplayer_minimax_search(miniMax, d=d)
             
         self.lastAction = goal
         
