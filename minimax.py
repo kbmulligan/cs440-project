@@ -104,9 +104,8 @@ class Vindinium(MiniMaxGame):
         
         state = deepcopy(initState)
         
-        
         #store this move in game.lastAction
-        state['game']['lastAction'] = str(move)
+#         state['game']['lastAction'] = str(move)
         
         moveAction = move[0]
         
@@ -114,6 +113,12 @@ class Vindinium(MiniMaxGame):
         globalTurn = state['game']['turn']
         playerId = (globalTurn % 4) 
         playerName = state['game']['heroes'][playerId ]['name']
+        
+        #store this in the player's last action
+        try:
+            state['game']['heroes'][playerId]['lastAction']['move'] = moveAction
+        except:
+            state['game']['heroes'][playerId]['lastAction'] = {'move' : moveAction, 'target' : -1}
         
         #save this palyer's name for utility calc
         state['game']['lastPlayer'] = playerName
@@ -193,6 +198,8 @@ class Vindinium(MiniMaxGame):
             
             playerPos = move[1]
             opponentId = int(move[2])
+            
+            state['game']['heroes'][playerId]['lastAction']['target'] = opponentId
             
             #calculate number of moves to location
             numMoves = self.calculateNumberOfMoves((myHeroPosY, myHeroPosX), playerPos)
@@ -348,7 +355,8 @@ class Vindinium(MiniMaxGame):
             
         #go over each item in vector and calculate the utility for each person
         utilityVector = []
-        
+       
+        heroIndex = 0 
         for goldAndMoves in eachPlayersGoldAndNumMoves:
             
             gold = goldAndMoves[0]
@@ -361,11 +369,37 @@ class Vindinium(MiniMaxGame):
             if numMovesToGetHere != 0:
                 #add small random values to help prevent ties
                 reduceMoves = log(int(numMovesToGetHere)) + random()
-                
-            #proximity premium
+            
+            #proximity premium only add to attack player if they actually have mines
             proxBonus = 0
+            
+            myLastMove = None
+            
+            try:
+                myLastMove = state['game']['heroes'][heroIndex]['lastAction']['move']
+            except:
+                myLastMove = None
+            
+            isMoveAttackPlayer = False
+            
+            if myLastMove == ATTACK_PLAYER_ACTION:
+                isMoveAttackPlayer = True
+            
             if numMovesToGetHere <= 3 and numMovesToGetHere >= 0:
-                proxBonus = 100
+                
+                addBonus = True
+                
+                #make sure if we're attacking a player, they actually have mines
+                if isMoveAttackPlayer:
+                    #get player 1 index id
+                    opId = int(state['game']['heroes'][heroIndex]['lastAction']['target'])
+                    opNumMine = state['game']['heroes'][opId - 1]['mineCount']
+                    
+                    if opNumMine == 0:
+                        addBonus = False
+                   
+                if addBonus: 
+                    proxBonus = 100
                 
         
             utility = gold - numMovesToGetHere + proxBonus
@@ -373,6 +407,8 @@ class Vindinium(MiniMaxGame):
             
 #             utilityVector.append(utility)
             utilityVector.append(utility)
+            
+            heroIndex = heroIndex + 1
             
         return utilityVector
     
