@@ -1,11 +1,10 @@
-#################################################
-# bot.py - Vindinium bot move AI
-# by Stephen Rhoads
-#    Brett Mulligan
-# Oct 2014
-# CSU CS440
-# Dr. Asa Ben-Hur
-#################################################
+'''
+bot.py - Vindinium bot AI
+@author: kbmulligan, scrhoads
+Oct 2014
+CSU CS440
+Dr. Asa Ben-Hur
+'''
 
 import random
 import time
@@ -18,9 +17,9 @@ import compare
 from minimax import Vindinium, HEAL_ACTION, \
     multiplayer_minimax_search
 
-BOT_NAME = 'nitorbot'
+BOT_NAME = 'rambot'
 
-VERBOSE_ASTAR = True
+VERBOSE_ASTAR = False
 SHOW_CUSTOM_MAP = True
 SHOW_MAP_EVERY_X_TURNS = 1
 
@@ -52,8 +51,8 @@ LIFE_THRESHOLD = 70
 MIN_LIFE = 21
 FULL_LIFE = 100
 
-COMFORTABLE_LEAD = 200          # how much more gold you want than the next closest bot before going defensive
-DESIRED_LEAD_MARGIN = 1.0       # (percent of current gold) how much of a lead you want before going defensive
+COMFORTABLE_LEAD = 200          # raw gold lead wanted before going defensive
+DESIRED_LEAD_MARGIN = 1.0       # percentage lead wanted before going defensive
 MIN_LEAD_MARGIN = 0.9
 NEVER_STOP = 100000
 
@@ -233,7 +232,7 @@ class RamBot(Bot):
 
         ##### MORE INFORMATION AND TIME/GAME MANAGEMENT #############
         print ''
-#         self.print_comparison_tests(game)
+        # self.print_comparison_tests(game)
 
         # Safety check -- I think bad dirs can cause HTTP 400 Errors - kbm
         direction = safety_check(direction)
@@ -295,7 +294,8 @@ class RamBot(Bot):
             (self.lastAction != None and self.lastAction[0] == HEAL_ACTION and self.life < 80)):                             # healing override
             goal = (HEAL,0)
         
-        """targets = compare.highest_value_targets(game, ENEMIES_TO_COMPARE)               # grab all targets
+        """
+        targets = compare.highest_value_targets(game, ENEMIES_TO_COMPARE)               # grab all targets
         hero_targets = [x for x in targets if x in game.heroes_locs and x != self.pos]  # filter for heroes
         if hero_targets:
             target = hero_targets[0]                                                    # select most valuable
@@ -340,7 +340,8 @@ class RamBot(Bot):
                 
                 destination.append(nearestTavernLoc)
                 
-            """if self.life + BEER_LIFE - get_distance(self.pos, destination[0]) < FULL_LIFE:
+            """
+            if self.life + BEER_LIFE - get_distance(self.pos, destination[0]) < FULL_LIFE:
                 destination.append(destination[0])
                 print destination
             """
