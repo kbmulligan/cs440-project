@@ -445,88 +445,24 @@ def multiplayer_minimax_search(miniMaxGame, d=4, cutoff_test=None, eval_fn=None)
     #get the initial state for all subsequent moves by us
     initialState = miniMaxGame.initial
     
-    def multiplayer_max_value(state, depth):
-        #check if terminal or depth to deep
-        if cutoff_test(state, depth):
-            evalVal = eval_fn(state)
-            return evalVal
-        
-        #initial value
-        bestScoreForThisPlayer = -infinity
-        bestTuple = None
-
-        
-        #get all possible actions for this_player in this state
-        actionList = miniMaxGame.actions(state)
-        
-        #get this_player zero based id and name
-        thisTurn_player_id = getZeroBasedPlayerIdForThisTurn(state)
-        thisTurn_player_name = state['game']['heroes'][thisTurn_player_id]['name']
-        
-        #go over every action and get the value for it
-        for action in actionList:
-            #get state resulting from this action
-            newState = miniMaxGame.result(state, action)
-            
-            #get this player's utility from the move
-            newTuple = multiplayer_max_value(newState, depth + 1)
-            thisPlayerUtility = newTuple[thisTurn_player_id]
-            
-            bestScoreForThisPlayer = max(bestScoreForThisPlayer, thisPlayerUtility)
-            
-            #if bestScore... == thisPlayerUtility, take this tuple as the best tuple
-            if bestScoreForThisPlayer == thisPlayerUtility:
-                bestTuple = newTuple
-            
-            
-#         print thisTurn_player_name + "[" + str(thisTurn_player_id) + "] best value is: " + str(bestScoreForThisPlayer) + " : " + str(bestTuple)
-#         print str(state['game']['turn']) + " globalTurn"
-#         print "\n"
-        return bestTuple
-            
-    
-    def getOurPlayerId(state):
-        return int(state['hero']['id'])
-    
-    def performActionAndSendStateIntoMultiPlayerMaxVal(action):
-        newState = miniMaxGame.result(initialState, action)
-        
-        maxTuple = multiplayer_max_value(newState, 0)
-        
-        #get our score from this tuple
-        ourHeroId = newState['hero']['id']
-        ourZeroIndexId = ourHeroId -1
-        
-        ourMaxVal = maxTuple[ourZeroIndexId]
-        
-        return ourMaxVal
-    
-    # Body of alphabeta_search starts here:
-    # The default test cuts off at depth d or at a terminal state
-    cutoff_test = (cutoff_test or
-                   (lambda state,depth: depth>d or miniMaxGame.terminal_test(state)))
-    
-    #calculates the utility tuple
-    eval_fn = eval_fn or (lambda state: miniMaxGame.utility(state))
-    
     #action list that is used to prime the dfs 
     actionList = miniMaxGame.actions(miniMaxGame.initial, True)
     print "actionList: " + str(actionList)
     
-    #will return the highest value action from actionList
-#     maxAction = argmax(actionList, performActionAndSendStateIntoMultiPlayerMaxVal)
-
-#     pool = Pool(processes=len(actionList))
+    #create pool to run each action in parallel
     pool = Pool()
     
-    actionResult = pool.map(performActionAndSendStateIntoMultiPlayerMaxVali2, itertools.izip(actionList, itertools.repeat(miniMaxGame), itertools.repeat(initialState), itertools.repeat(d)))
+    #get all the results for the actions. this is a blocking call
+    actionResult = pool.map(performActionAndSendStateIntoMultiPlayerMaxVal, itertools.izip(actionList, itertools.repeat(miniMaxGame), itertools.repeat(initialState), itertools.repeat(d)))
     
     pool.close()
     pool.terminate()
     
+    #setup initial values for the max val and action
     maxAction = actionResult[0][0]
     maxScore = actionResult[0][1]
     
+    #go over all results and pick out the best one
     for result in actionResult:
         thisScore = result[1]
         
@@ -538,8 +474,8 @@ def multiplayer_minimax_search(miniMaxGame, d=4, cutoff_test=None, eval_fn=None)
     
     return maxAction
 
-def multiplayer_max_value2(state, depth, miniMaxGame, cutoff_test, eval_fn):
-        #check if terminal or depth to deep
+def multiplayer_max_value(state, depth, miniMaxGame, cutoff_test, eval_fn):
+        #check if terminal or depth to0 deep
         if cutoff_test(state, depth):
             evalVal = eval_fn(state)
             return evalVal
@@ -547,14 +483,12 @@ def multiplayer_max_value2(state, depth, miniMaxGame, cutoff_test, eval_fn):
         #initial value
         bestScoreForThisPlayer = -infinity
         bestTuple = None
-
         
         #get all possible actions for this_player in this state
         actionList = miniMaxGame.actions(state)
         
-        #get this_player zero based id and name
+        #get this_player's zero based id e
         thisTurn_player_id = getZeroBasedPlayerIdForThisTurn(state)
-        thisTurn_player_name = state['game']['heroes'][thisTurn_player_id]['name']
         
         #go over every action and get the value for it
         for action in actionList:
@@ -562,7 +496,7 @@ def multiplayer_max_value2(state, depth, miniMaxGame, cutoff_test, eval_fn):
             newState = miniMaxGame.result(state, action)
             
             #get this player's utility from the move
-            newTuple = multiplayer_max_value2(newState, depth + 1, miniMaxGame, cutoff_test, eval_fn)
+            newTuple = multiplayer_max_value(newState, depth + 1, miniMaxGame, cutoff_test, eval_fn)
             thisPlayerUtility = newTuple[thisTurn_player_id]
             
             bestScoreForThisPlayer = max(bestScoreForThisPlayer, thisPlayerUtility)
@@ -571,13 +505,9 @@ def multiplayer_max_value2(state, depth, miniMaxGame, cutoff_test, eval_fn):
             if bestScoreForThisPlayer == thisPlayerUtility:
                 bestTuple = newTuple
             
-            
-#         print thisTurn_player_name + "[" + str(thisTurn_player_id) + "] best value is: " + str(bestScoreForThisPlayer) + " : " + str(bestTuple)
-#         print str(state['game']['turn']) + " globalTurn"
-#         print "\n"
         return bestTuple
 
-def performActionAndSendStateIntoMultiPlayerMaxVali2((action, miniMaxGame, initialState, d)):
+def performActionAndSendStateIntoMultiPlayerMaxVal((action, miniMaxGame, initialState, d)):
     print "action: " + str(action)
     newState = miniMaxGame.result(initialState, action)
     
@@ -586,7 +516,7 @@ def performActionAndSendStateIntoMultiPlayerMaxVali2((action, miniMaxGame, initi
     #calculates the utility tuple
     eval_fn = (lambda state: miniMaxGame.utility(state))
     
-    maxTuple = multiplayer_max_value2(newState, 0, miniMaxGame, cutoff_test, eval_fn)
+    maxTuple = multiplayer_max_value(newState, 0, miniMaxGame, cutoff_test, eval_fn)
     
     #get our score from this tuple
     ourHeroId = newState['hero']['id']
@@ -598,73 +528,4 @@ def performActionAndSendStateIntoMultiPlayerMaxVali2((action, miniMaxGame, initi
 
         
     
-def alphabeta_search(miniMaxGame, d=4, cutoff_test=None, eval_fn=None):
-    """Search miniMaxGame to determine best action; use alpha-beta pruning.
-    This version cuts off search and uses an evaluation function."""
-
-    player = miniMaxGame.myHeroName
-    initialState = miniMaxGame.initial
-#     state = miniMaxGame.initial
-
-    def max_value(state, alpha, beta, depth):
-        if cutoff_test(state, depth):
-            evalVal = eval_fn(state) 
-            return evalVal
-        v = -infinity
-        actionList = miniMaxGame.actions(state)
-        for a in actionList:
-            newState = miniMaxGame.result(state, a)
-            v = max(v, min_value(newState, alpha, beta, depth+1))
-            if v >= beta:
-                return v
-            alpha = max(alpha, v)
-        return v
-
-    def min_value(state, alpha, beta, depth):
-        if cutoff_test(state, depth):
-            evalVal = eval_fn(state) 
-            return evalVal
-        v = infinity
-        actionList = miniMaxGame.actions(state) 
-        for a in actionList:
-            newState = miniMaxGame.result(state, a)
-            v = min(v, max_value(newState, alpha, beta, depth+1))
-            if v <= alpha:
-                return v
-            beta = min(beta, v)
-        return v
-    
-    def getZeroBasedPlayerIdForThisTurn(state):
-        
-        globalTurn = state['game']['turn']
-        playerId = (globalTurn % 4) 
-        
-        return playerId
-    
-    def getOurPlayerId(state):
-        return int(state['hero']['id'])
-        
-    
-    def argMaxMinVal(action):
-        newState = miniMaxGame.result(initialState, action)
-#         print "action : " + str(action) + "'s result:"
-#         print pretty_map(Game(newState, miniMaxGame.myHeroName))
-#         minVal = max_value(newState, -infinity, infinity, 0)
-        minVal = min_value(newState, -infinity, infinity, 0)
-        
-        return minVal
-
-    # Body of alphabeta_search starts here:
-    # The default test cuts off at depth d or at a terminal state
-    cutoff_test = (cutoff_test or
-                   (lambda state,depth: depth>d or miniMaxGame.terminal_test(state)))
-    eval_fn = eval_fn or (lambda state: miniMaxGame.utility(state))
-    
-    actionList = miniMaxGame.actions(miniMaxGame.initial, True)
-    print "actionList: " + str(actionList)
-#     return argmax(actionList,
-#                   lambda a: min_value(miniMaxGame.result(miniMaxGame.initial, a),
-#                                       -infinity, infinity, 0))
-    maxArg = argmax(actionList, argMaxMinVal)
-    return maxArg
     

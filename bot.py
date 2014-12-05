@@ -310,12 +310,13 @@ class RamBot(Bot):
           
             #default depth 
             d = 1 
-            #determine depth of search based off of board size
-            if state['game']['board']['size'] > 18:
+
+            #determine depth of search based off of board size or # of taverns
+            if state['game']['board']['size'] > 18 or len(game.taverns_locs) > 20:
                 #only look at our player
                 d = 0
-                
             
+            #send to max finder
             goal = multiplayer_minimax_search(miniMax, d=d)
             
         self.lastAction = goal
