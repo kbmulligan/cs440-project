@@ -481,7 +481,7 @@ def multiplayer_minimax_search(miniMaxGame, d=4, cutoff_test=None, eval_fn=None)
 #     maxAction = argmax(actionList, performActionAndSendStateIntoMultiPlayerMaxVal)
 
 #     pool = Pool(processes=len(actionList))
-    pool = Pool(processes=2)
+    pool = Pool(processes=4)
     
     actionResult = pool.map(performActionAndSendStateIntoMultiPlayerMaxVali2, itertools.izip(actionList, itertools.repeat(miniMaxGame), itertools.repeat(initialState), itertools.repeat(d)))
     
