@@ -319,7 +319,7 @@ class RamBot(Bot):
             d = 1 
 
             #determine depth of search based off of board size or # of taverns
-            if state['game']['board']['size'] > 18 or len(game.taverns_locs) > 20:
+            if state['game']['board']['size'] > 15 or len(game.taverns_locs) > 20:
                 #only look at our player
                 d = 0
             

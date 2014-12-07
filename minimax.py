@@ -393,13 +393,31 @@ class Vindinium(MiniMaxGame):
                 if isMoveAttackPlayer:
                     #get player 1 index id
                     opId = int(state['game']['heroes'][heroIndex]['lastAction']['target'])
-                    opNumMine = state['game']['heroes'][opId - 1]['mineCount']
                     
-                    if opNumMine <= 1:
+                    #make sure opponent isn't on their respawn point
+                    if state['game']['heroes'][opId -1]['pos'] == state['game']['heroes'][opId-1]['spawnPos']:
                         addBonus = False
+                    else:
+                        #not at spawn point, carry on
+                        opNumMine = state['game']['heroes'][opId - 1]['mineCount']
+                        
+                        if opNumMine <= 1:
+                            addBonus = False
+                        else:
+                            #attack weaker players w/ some value to give us
+                        
+                            if state['game']['heroes'][opId -1]['life'] < state['hero']['life']:
+                                addBonus = True
+                            
+                    
+                        
                    
                 if addBonus: 
                     proxBonus = 100
+                    
+                    #if we are right next to something, act
+                    if numMovesToGetHere <= 1:
+                        proxBonus = proxBonus + 10
                     
                     #make attacking players more attractive
 #                     if isMoveAttackPlayer:
