@@ -385,7 +385,7 @@ class Vindinium(MiniMaxGame):
             if myLastMove == ATTACK_PLAYER_ACTION:
                 isMoveAttackPlayer = True
             
-            if numMovesToGetHere <= 3 and numMovesToGetHere >= 0:
+            if numMovesToGetHere <= 4 and numMovesToGetHere >= 0:
                 
                 addBonus = True
                 
@@ -395,12 +395,15 @@ class Vindinium(MiniMaxGame):
                     opId = int(state['game']['heroes'][heroIndex]['lastAction']['target'])
                     opNumMine = state['game']['heroes'][opId - 1]['mineCount']
                     
-                    if opNumMine == 0:
+                    if opNumMine <= 1:
                         addBonus = False
                    
                 if addBonus: 
                     proxBonus = 100
-                
+                    
+                    #make attacking players more attractive
+#                     if isMoveAttackPlayer:
+#                         proxBonus = proxBonus + 50
         
             utility = gold - numMovesToGetHere + proxBonus
 #             utility = gold - opponentsGoldSum - reduceMoves

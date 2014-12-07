@@ -179,12 +179,19 @@ class RamBot(Bot):
             path = self.pf.get_path(self.pos, self.get_current_waypoint(), game.board, self.path_heuristic)
             
             #make sure we have a valid path, if not revert to heal
+            searches = 1
             while (path == [self.pos, self.pos]) and self.goal != DEFEND:
                 self.remove_current_waypoint()
                 
                 self.add_waypoint(self.determine_dest(HEAL, game, randomness=True)[0])
                 
                 path = self.pf.get_path(self.pos, self.get_current_waypoint(), game.board, self.path_heuristic)
+                
+                searches = searches + 1
+                
+                if searches > MAX_SEARCHES:
+                    path = [self.pos, self.pos]
+                    break
                 
             
         ###self.evaluate_waypoints()   # This version seems to do well

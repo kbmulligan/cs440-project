@@ -82,12 +82,20 @@ def start(server_url, key, mode, turns, bot, use_map=MAP):
         # Send the move and receive the updated game state
         url = state['playUrl']
         state = move(session, url, direction)
+        
+    #append the elo score to the elo.txt file
+    recordElo(state['hero']['name'], state['hero']['elo'])
+    
 
     # Clean up the session
     session.close()
     
     return viewURL
 
+def recordElo(playerName, elo):
+    f = open("elo.txt", "a")
+    f.write(playerName + "," + str(elo) + "\n")
+    f.close()
 
 def recordURL(viewUrl, mode):
     vf = open(vfName, 'r+')
