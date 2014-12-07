@@ -4,7 +4,7 @@ Created on Oct 31, 2014
 @author: scrhoads
 '''
 import unittest
-from minimax import Vindinium, alphabeta_search, multiplayer_minimax_search, getZeroBasedPlayerIdForThisTurn
+from minimax import Vindinium, multiplayer_minimax_search, getZeroBasedPlayerIdForThisTurn
 from time import time
 
 
@@ -200,6 +200,8 @@ class Test(unittest.TestCase):
         tdiff = time() - t0
         print "took : " + str(tdiff) + " sec"
         print "timeBigGameBoard\n"
+        print "tiles: " + str(initial['game']['board']['size'])
+
         print move
         
 

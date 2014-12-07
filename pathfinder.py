@@ -1,11 +1,10 @@
-#################################################
-# pathfinder.py - Vindinium bot A* pathfinding
-# by Stephen Rhoads
-#    Brett Mulligan
-# Oct 2014
-# CSU CS440
-# Dr. Asa Ben-Hur
-#################################################
+'''
+pathfinder.py - Vindinium bot A* pathfinding
+@author: kbmulligan
+Oct 2014
+CSU CS440
+Dr. Asa Ben-Hur
+'''
 
 import time
 from game import Game, Board, MineTile, HeroTile
