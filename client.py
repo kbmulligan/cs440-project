@@ -1,15 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import os
 import sys
 import requests
-import re
 import time
 from bot import RandomBot, SlowBot, RamBot, ManualBot
 
 TIMEOUT=15
-MAP = 'm5'
+MAP = 'm4'
 
 vfName = 'viewgames.html'
 
@@ -68,6 +66,8 @@ def start(server_url, key, mode, turns, bot, use_map=MAP):
     state = get_new_game_state(session, server_url, key, mode, turns, use_map)
     print("Playing at: " + state['viewUrl'])
     viewURL = state['viewUrl']
+    
+    print ("init game state: " + str(state))
 
     recordURL(viewURL, mode)
 
@@ -82,12 +82,20 @@ def start(server_url, key, mode, turns, bot, use_map=MAP):
         # Send the move and receive the updated game state
         url = state['playUrl']
         state = move(session, url, direction)
+        
+    #append the elo score to the elo.txt file
+    recordElo(state['hero']['name'], state['hero']['elo'])
+    
 
     # Clean up the session
     session.close()
     
     return viewURL
 
+def recordElo(playerName, elo):
+    f = open("elo.txt", "a")
+    f.write(playerName + "," + str(elo) + "\n")
+    f.close()
 
 def recordURL(viewUrl, mode):
     vf = open(vfName, 'r+')
